@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:gym_dude/app.dart';
 import 'package:gym_dude/data/database.dart';
+import 'package:gym_dude/providers/routine_providers.dart';
 import 'package:gym_dude/providers/settings_providers.dart';
 import 'package:gym_dude/providers/workout_providers.dart';
 
@@ -22,6 +23,14 @@ void main() {
               .overrideWith((ref) => Stream.value(null)),
           trainingStatsProvider
               .overrideWith((ref) => Stream.value(TrainingStats.empty)),
+          routineItemsProvider
+              .overrideWith((ref) => Stream.value(const <RoutineItem>[])),
+          routineChecksTodayProvider
+              .overrideWith((ref) => Stream.value(const <RoutineCheck>[])),
+          mealPrepTasksProvider
+              .overrideWith((ref) => Stream.value(const <MealPrepTask>[])),
+          mealPrepChecksThisWeekProvider
+              .overrideWith((ref) => Stream.value(const <MealPrepCheck>[])),
         ],
         child: const GymDudeApp(),
       ),

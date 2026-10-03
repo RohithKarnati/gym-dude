@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../data/database.dart';
+import '../../providers/routine_providers.dart';
 import '../../providers/workout_providers.dart';
 import '../../utils/weekdays.dart';
 import '../train/session_logger_screen.dart';
@@ -38,6 +39,8 @@ class HomeScreen extends ConsumerWidget {
               _StreakRow(stats: stats),
               const SizedBox(height: 16),
               _TodayCard(day: todayDay),
+              const SizedBox(height: 16),
+              const _RoutineProgressCard(),
             ],
           );
         },
@@ -232,6 +235,73 @@ class _TodayCard extends ConsumerWidget {
           sessionId: session.id,
           dayId: day!.id,
           dayTitle: day!.title,
+        ),
+      ),
+    );
+  }
+}
+
+/// Daily checklist progress ring on the home screen (F5 glance).
+class _RoutineProgressCard extends ConsumerWidget {
+  const _RoutineProgressCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    final progress = ref.watch(dailyProgressProvider);
+    final total = progress.total;
+    final done = progress.done;
+    final frac = total == 0 ? 0.0 : done / total;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 52,
+              height: 52,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  SizedBox(
+                    width: 52,
+                    height: 52,
+                    child: CircularProgressIndicator(
+                      value: total == 0 ? 0 : frac,
+                      strokeWidth: 6,
+                      backgroundColor: scheme.surfaceContainerHighest,
+                    ),
+                  ),
+                  Text(total == 0 ? '—' : '$done/$total',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700, fontSize: 12)),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Daily routine',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 2),
+                  Text(
+                    total == 0
+                        ? 'Set it up in the Routine tab.'
+                        : done == total
+                            ? 'All done today! 🎉'
+                            : '${total - done} left today',
+                    style: TextStyle(color: scheme.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

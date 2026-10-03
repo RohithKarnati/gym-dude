@@ -5,6 +5,7 @@ import '../../data/database.dart';
 import '../../providers/workout_providers.dart';
 import '../../utils/weekdays.dart';
 import 'day_editor_screen.dart';
+import 'pr_history_screen.dart';
 import 'session_logger_screen.dart';
 
 /// Train tab: the weekly split overview (F1) + entry to today's session (F2).
@@ -17,7 +18,18 @@ class TrainScreen extends ConsumerWidget {
     final today = todayWeekday();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Weekly plan')),
+      appBar: AppBar(
+        title: const Text('Weekly plan'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.emoji_events_outlined),
+            tooltip: 'Personal records',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const PrHistoryScreen()),
+            ),
+          ),
+        ],
+      ),
       body: daysAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
