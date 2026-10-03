@@ -104,6 +104,7 @@ class AppSettings extends Table {
   BoolColumn get notifyMorning => boolean().withDefault(const Constant(false))();
   TextColumn get bedtimeTarget => text().nullable()();
   TextColumn get weightUnit => text().withDefault(const Constant('kg'))();
+  TextColumn get themeMode => text().withDefault(const Constant('system'))(); // system | light | dark
 
   @override
   Set<Column> get primaryKey => {id};

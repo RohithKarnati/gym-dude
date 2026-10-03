@@ -3720,6 +3720,18 @@ class $AppSettingsTable extends AppSettings
     requiredDuringInsert: false,
     defaultValue: const Constant('kg'),
   );
+  static const VerificationMeta _themeModeMeta = const VerificationMeta(
+    'themeMode',
+  );
+  @override
+  late final GeneratedColumn<String> themeMode = GeneratedColumn<String>(
+    'theme_mode',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('system'),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -3728,6 +3740,7 @@ class $AppSettingsTable extends AppSettings
     notifyMorning,
     bedtimeTarget,
     weightUnit,
+    themeMode,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -3786,6 +3799,12 @@ class $AppSettingsTable extends AppSettings
         weightUnit.isAcceptableOrUnknown(data['weight_unit']!, _weightUnitMeta),
       );
     }
+    if (data.containsKey('theme_mode')) {
+      context.handle(
+        _themeModeMeta,
+        themeMode.isAcceptableOrUnknown(data['theme_mode']!, _themeModeMeta),
+      );
+    }
     return context;
   }
 
@@ -3819,6 +3838,10 @@ class $AppSettingsTable extends AppSettings
         DriftSqlType.string,
         data['${effectivePrefix}weight_unit'],
       )!,
+      themeMode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}theme_mode'],
+      )!,
     );
   }
 
@@ -3835,6 +3858,7 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
   final bool notifyMorning;
   final String? bedtimeTarget;
   final String weightUnit;
+  final String themeMode;
   const AppSetting({
     required this.id,
     required this.notifyDayBefore,
@@ -3842,6 +3866,7 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
     required this.notifyMorning,
     this.bedtimeTarget,
     required this.weightUnit,
+    required this.themeMode,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -3854,6 +3879,7 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
       map['bedtime_target'] = Variable<String>(bedtimeTarget);
     }
     map['weight_unit'] = Variable<String>(weightUnit);
+    map['theme_mode'] = Variable<String>(themeMode);
     return map;
   }
 
@@ -3867,6 +3893,7 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
           ? const Value.absent()
           : Value(bedtimeTarget),
       weightUnit: Value(weightUnit),
+      themeMode: Value(themeMode),
     );
   }
 
@@ -3882,6 +3909,7 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
       notifyMorning: serializer.fromJson<bool>(json['notifyMorning']),
       bedtimeTarget: serializer.fromJson<String?>(json['bedtimeTarget']),
       weightUnit: serializer.fromJson<String>(json['weightUnit']),
+      themeMode: serializer.fromJson<String>(json['themeMode']),
     );
   }
   @override
@@ -3894,6 +3922,7 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
       'notifyMorning': serializer.toJson<bool>(notifyMorning),
       'bedtimeTarget': serializer.toJson<String?>(bedtimeTarget),
       'weightUnit': serializer.toJson<String>(weightUnit),
+      'themeMode': serializer.toJson<String>(themeMode),
     };
   }
 
@@ -3904,6 +3933,7 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
     bool? notifyMorning,
     Value<String?> bedtimeTarget = const Value.absent(),
     String? weightUnit,
+    String? themeMode,
   }) => AppSetting(
     id: id ?? this.id,
     notifyDayBefore: notifyDayBefore ?? this.notifyDayBefore,
@@ -3913,6 +3943,7 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
         ? bedtimeTarget.value
         : this.bedtimeTarget,
     weightUnit: weightUnit ?? this.weightUnit,
+    themeMode: themeMode ?? this.themeMode,
   );
   AppSetting copyWithCompanion(AppSettingsCompanion data) {
     return AppSetting(
@@ -3932,6 +3963,7 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
       weightUnit: data.weightUnit.present
           ? data.weightUnit.value
           : this.weightUnit,
+      themeMode: data.themeMode.present ? data.themeMode.value : this.themeMode,
     );
   }
 
@@ -3943,7 +3975,8 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
           ..write('notifyBedtime: $notifyBedtime, ')
           ..write('notifyMorning: $notifyMorning, ')
           ..write('bedtimeTarget: $bedtimeTarget, ')
-          ..write('weightUnit: $weightUnit')
+          ..write('weightUnit: $weightUnit, ')
+          ..write('themeMode: $themeMode')
           ..write(')'))
         .toString();
   }
@@ -3956,6 +3989,7 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
     notifyMorning,
     bedtimeTarget,
     weightUnit,
+    themeMode,
   );
   @override
   bool operator ==(Object other) =>
@@ -3966,7 +4000,8 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
           other.notifyBedtime == this.notifyBedtime &&
           other.notifyMorning == this.notifyMorning &&
           other.bedtimeTarget == this.bedtimeTarget &&
-          other.weightUnit == this.weightUnit);
+          other.weightUnit == this.weightUnit &&
+          other.themeMode == this.themeMode);
 }
 
 class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
@@ -3976,6 +4011,7 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
   final Value<bool> notifyMorning;
   final Value<String?> bedtimeTarget;
   final Value<String> weightUnit;
+  final Value<String> themeMode;
   const AppSettingsCompanion({
     this.id = const Value.absent(),
     this.notifyDayBefore = const Value.absent(),
@@ -3983,6 +4019,7 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
     this.notifyMorning = const Value.absent(),
     this.bedtimeTarget = const Value.absent(),
     this.weightUnit = const Value.absent(),
+    this.themeMode = const Value.absent(),
   });
   AppSettingsCompanion.insert({
     this.id = const Value.absent(),
@@ -3991,6 +4028,7 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
     this.notifyMorning = const Value.absent(),
     this.bedtimeTarget = const Value.absent(),
     this.weightUnit = const Value.absent(),
+    this.themeMode = const Value.absent(),
   });
   static Insertable<AppSetting> custom({
     Expression<int>? id,
@@ -3999,6 +4037,7 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
     Expression<bool>? notifyMorning,
     Expression<String>? bedtimeTarget,
     Expression<String>? weightUnit,
+    Expression<String>? themeMode,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -4007,6 +4046,7 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
       if (notifyMorning != null) 'notify_morning': notifyMorning,
       if (bedtimeTarget != null) 'bedtime_target': bedtimeTarget,
       if (weightUnit != null) 'weight_unit': weightUnit,
+      if (themeMode != null) 'theme_mode': themeMode,
     });
   }
 
@@ -4017,6 +4057,7 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
     Value<bool>? notifyMorning,
     Value<String?>? bedtimeTarget,
     Value<String>? weightUnit,
+    Value<String>? themeMode,
   }) {
     return AppSettingsCompanion(
       id: id ?? this.id,
@@ -4025,6 +4066,7 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
       notifyMorning: notifyMorning ?? this.notifyMorning,
       bedtimeTarget: bedtimeTarget ?? this.bedtimeTarget,
       weightUnit: weightUnit ?? this.weightUnit,
+      themeMode: themeMode ?? this.themeMode,
     );
   }
 
@@ -4049,6 +4091,9 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
     if (weightUnit.present) {
       map['weight_unit'] = Variable<String>(weightUnit.value);
     }
+    if (themeMode.present) {
+      map['theme_mode'] = Variable<String>(themeMode.value);
+    }
     return map;
   }
 
@@ -4060,7 +4105,8 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
           ..write('notifyBedtime: $notifyBedtime, ')
           ..write('notifyMorning: $notifyMorning, ')
           ..write('bedtimeTarget: $bedtimeTarget, ')
-          ..write('weightUnit: $weightUnit')
+          ..write('weightUnit: $weightUnit, ')
+          ..write('themeMode: $themeMode')
           ..write(')'))
         .toString();
   }
@@ -7263,6 +7309,7 @@ typedef $$AppSettingsTableCreateCompanionBuilder =
       Value<bool> notifyMorning,
       Value<String?> bedtimeTarget,
       Value<String> weightUnit,
+      Value<String> themeMode,
     });
 typedef $$AppSettingsTableUpdateCompanionBuilder =
     AppSettingsCompanion Function({
@@ -7272,6 +7319,7 @@ typedef $$AppSettingsTableUpdateCompanionBuilder =
       Value<bool> notifyMorning,
       Value<String?> bedtimeTarget,
       Value<String> weightUnit,
+      Value<String> themeMode,
     });
 
 class $$AppSettingsTableFilterComposer
@@ -7310,6 +7358,11 @@ class $$AppSettingsTableFilterComposer
 
   ColumnFilters<String> get weightUnit => $composableBuilder(
     column: $table.weightUnit,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get themeMode => $composableBuilder(
+    column: $table.themeMode,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -7352,6 +7405,11 @@ class $$AppSettingsTableOrderingComposer
     column: $table.weightUnit,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get themeMode => $composableBuilder(
+    column: $table.themeMode,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$AppSettingsTableAnnotationComposer
@@ -7390,6 +7448,9 @@ class $$AppSettingsTableAnnotationComposer
     column: $table.weightUnit,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get themeMode =>
+      $composableBuilder(column: $table.themeMode, builder: (column) => column);
 }
 
 class $$AppSettingsTableTableManager
@@ -7429,6 +7490,7 @@ class $$AppSettingsTableTableManager
                 Value<bool> notifyMorning = const Value.absent(),
                 Value<String?> bedtimeTarget = const Value.absent(),
                 Value<String> weightUnit = const Value.absent(),
+                Value<String> themeMode = const Value.absent(),
               }) => AppSettingsCompanion(
                 id: id,
                 notifyDayBefore: notifyDayBefore,
@@ -7436,6 +7498,7 @@ class $$AppSettingsTableTableManager
                 notifyMorning: notifyMorning,
                 bedtimeTarget: bedtimeTarget,
                 weightUnit: weightUnit,
+                themeMode: themeMode,
               ),
           createCompanionCallback:
               ({
@@ -7445,6 +7508,7 @@ class $$AppSettingsTableTableManager
                 Value<bool> notifyMorning = const Value.absent(),
                 Value<String?> bedtimeTarget = const Value.absent(),
                 Value<String> weightUnit = const Value.absent(),
+                Value<String> themeMode = const Value.absent(),
               }) => AppSettingsCompanion.insert(
                 id: id,
                 notifyDayBefore: notifyDayBefore,
@@ -7452,6 +7516,7 @@ class $$AppSettingsTableTableManager
                 notifyMorning: notifyMorning,
                 bedtimeTarget: bedtimeTarget,
                 weightUnit: weightUnit,
+                themeMode: themeMode,
               ),
           withReferenceMapper: (p0) => p0
               .map(

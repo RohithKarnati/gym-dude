@@ -4,19 +4,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:gym_dude/app.dart';
 import 'package:gym_dude/data/database.dart';
+import 'package:gym_dude/providers/settings_providers.dart';
 import 'package:gym_dude/providers/workout_providers.dart';
 
 void main() {
   testWidgets('App boots into the 4-tab shell and shows the weekly plan',
       (tester) async {
-    // Override the plan stream with a plain, empty stream so the test never
-    // touches the real drift database (avoids platform channels, native
-    // sqlite and drift's deferred stream-close timers under fake async).
+    // Override every DB-backed provider the visible tree reads, so the test
+    // never touches the real drift database (no platform channels, native
+    // sqlite, or drift stream-close timers under fake async).
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           allDaysProvider
               .overrideWith((ref) => Stream.value(const <WorkoutDay>[])),
+          settingsProvider
+              .overrideWith((ref) => Stream.value(null)),
+          trainingStatsProvider
+              .overrideWith((ref) => Stream.value(TrainingStats.empty)),
         ],
         child: const GymDudeApp(),
       ),
