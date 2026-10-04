@@ -31,7 +31,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -42,6 +42,10 @@ class AppDatabase extends _$AppDatabase {
           if (from < 2) {
             // Added in v2: user-selectable theme mode.
             await m.addColumn(appSettings, appSettings.themeMode);
+          }
+          if (from < 3) {
+            // Added in v3: first-run tour completion flag.
+            await m.addColumn(appSettings, appSettings.hasSeenTour);
           }
         },
         beforeOpen: (details) async {
