@@ -3732,6 +3732,21 @@ class $AppSettingsTable extends AppSettings
     requiredDuringInsert: false,
     defaultValue: const Constant('system'),
   );
+  static const VerificationMeta _hasSeenTourMeta = const VerificationMeta(
+    'hasSeenTour',
+  );
+  @override
+  late final GeneratedColumn<bool> hasSeenTour = GeneratedColumn<bool>(
+    'has_seen_tour',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("has_seen_tour" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -3741,6 +3756,7 @@ class $AppSettingsTable extends AppSettings
     bedtimeTarget,
     weightUnit,
     themeMode,
+    hasSeenTour,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -3805,6 +3821,15 @@ class $AppSettingsTable extends AppSettings
         themeMode.isAcceptableOrUnknown(data['theme_mode']!, _themeModeMeta),
       );
     }
+    if (data.containsKey('has_seen_tour')) {
+      context.handle(
+        _hasSeenTourMeta,
+        hasSeenTour.isAcceptableOrUnknown(
+          data['has_seen_tour']!,
+          _hasSeenTourMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -3842,6 +3867,10 @@ class $AppSettingsTable extends AppSettings
         DriftSqlType.string,
         data['${effectivePrefix}theme_mode'],
       )!,
+      hasSeenTour: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}has_seen_tour'],
+      )!,
     );
   }
 
@@ -3859,6 +3888,7 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
   final String? bedtimeTarget;
   final String weightUnit;
   final String themeMode;
+  final bool hasSeenTour;
   const AppSetting({
     required this.id,
     required this.notifyDayBefore,
@@ -3867,6 +3897,7 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
     this.bedtimeTarget,
     required this.weightUnit,
     required this.themeMode,
+    required this.hasSeenTour,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -3880,6 +3911,7 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
     }
     map['weight_unit'] = Variable<String>(weightUnit);
     map['theme_mode'] = Variable<String>(themeMode);
+    map['has_seen_tour'] = Variable<bool>(hasSeenTour);
     return map;
   }
 
@@ -3894,6 +3926,7 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
           : Value(bedtimeTarget),
       weightUnit: Value(weightUnit),
       themeMode: Value(themeMode),
+      hasSeenTour: Value(hasSeenTour),
     );
   }
 
@@ -3910,6 +3943,7 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
       bedtimeTarget: serializer.fromJson<String?>(json['bedtimeTarget']),
       weightUnit: serializer.fromJson<String>(json['weightUnit']),
       themeMode: serializer.fromJson<String>(json['themeMode']),
+      hasSeenTour: serializer.fromJson<bool>(json['hasSeenTour']),
     );
   }
   @override
@@ -3923,6 +3957,7 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
       'bedtimeTarget': serializer.toJson<String?>(bedtimeTarget),
       'weightUnit': serializer.toJson<String>(weightUnit),
       'themeMode': serializer.toJson<String>(themeMode),
+      'hasSeenTour': serializer.toJson<bool>(hasSeenTour),
     };
   }
 
@@ -3934,6 +3969,7 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
     Value<String?> bedtimeTarget = const Value.absent(),
     String? weightUnit,
     String? themeMode,
+    bool? hasSeenTour,
   }) => AppSetting(
     id: id ?? this.id,
     notifyDayBefore: notifyDayBefore ?? this.notifyDayBefore,
@@ -3944,6 +3980,7 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
         : this.bedtimeTarget,
     weightUnit: weightUnit ?? this.weightUnit,
     themeMode: themeMode ?? this.themeMode,
+    hasSeenTour: hasSeenTour ?? this.hasSeenTour,
   );
   AppSetting copyWithCompanion(AppSettingsCompanion data) {
     return AppSetting(
@@ -3964,6 +4001,9 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
           ? data.weightUnit.value
           : this.weightUnit,
       themeMode: data.themeMode.present ? data.themeMode.value : this.themeMode,
+      hasSeenTour: data.hasSeenTour.present
+          ? data.hasSeenTour.value
+          : this.hasSeenTour,
     );
   }
 
@@ -3976,7 +4016,8 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
           ..write('notifyMorning: $notifyMorning, ')
           ..write('bedtimeTarget: $bedtimeTarget, ')
           ..write('weightUnit: $weightUnit, ')
-          ..write('themeMode: $themeMode')
+          ..write('themeMode: $themeMode, ')
+          ..write('hasSeenTour: $hasSeenTour')
           ..write(')'))
         .toString();
   }
@@ -3990,6 +4031,7 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
     bedtimeTarget,
     weightUnit,
     themeMode,
+    hasSeenTour,
   );
   @override
   bool operator ==(Object other) =>
@@ -4001,7 +4043,8 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
           other.notifyMorning == this.notifyMorning &&
           other.bedtimeTarget == this.bedtimeTarget &&
           other.weightUnit == this.weightUnit &&
-          other.themeMode == this.themeMode);
+          other.themeMode == this.themeMode &&
+          other.hasSeenTour == this.hasSeenTour);
 }
 
 class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
@@ -4012,6 +4055,7 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
   final Value<String?> bedtimeTarget;
   final Value<String> weightUnit;
   final Value<String> themeMode;
+  final Value<bool> hasSeenTour;
   const AppSettingsCompanion({
     this.id = const Value.absent(),
     this.notifyDayBefore = const Value.absent(),
@@ -4020,6 +4064,7 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
     this.bedtimeTarget = const Value.absent(),
     this.weightUnit = const Value.absent(),
     this.themeMode = const Value.absent(),
+    this.hasSeenTour = const Value.absent(),
   });
   AppSettingsCompanion.insert({
     this.id = const Value.absent(),
@@ -4029,6 +4074,7 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
     this.bedtimeTarget = const Value.absent(),
     this.weightUnit = const Value.absent(),
     this.themeMode = const Value.absent(),
+    this.hasSeenTour = const Value.absent(),
   });
   static Insertable<AppSetting> custom({
     Expression<int>? id,
@@ -4038,6 +4084,7 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
     Expression<String>? bedtimeTarget,
     Expression<String>? weightUnit,
     Expression<String>? themeMode,
+    Expression<bool>? hasSeenTour,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -4047,6 +4094,7 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
       if (bedtimeTarget != null) 'bedtime_target': bedtimeTarget,
       if (weightUnit != null) 'weight_unit': weightUnit,
       if (themeMode != null) 'theme_mode': themeMode,
+      if (hasSeenTour != null) 'has_seen_tour': hasSeenTour,
     });
   }
 
@@ -4058,6 +4106,7 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
     Value<String?>? bedtimeTarget,
     Value<String>? weightUnit,
     Value<String>? themeMode,
+    Value<bool>? hasSeenTour,
   }) {
     return AppSettingsCompanion(
       id: id ?? this.id,
@@ -4067,6 +4116,7 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
       bedtimeTarget: bedtimeTarget ?? this.bedtimeTarget,
       weightUnit: weightUnit ?? this.weightUnit,
       themeMode: themeMode ?? this.themeMode,
+      hasSeenTour: hasSeenTour ?? this.hasSeenTour,
     );
   }
 
@@ -4094,6 +4144,9 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
     if (themeMode.present) {
       map['theme_mode'] = Variable<String>(themeMode.value);
     }
+    if (hasSeenTour.present) {
+      map['has_seen_tour'] = Variable<bool>(hasSeenTour.value);
+    }
     return map;
   }
 
@@ -4106,7 +4159,8 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
           ..write('notifyMorning: $notifyMorning, ')
           ..write('bedtimeTarget: $bedtimeTarget, ')
           ..write('weightUnit: $weightUnit, ')
-          ..write('themeMode: $themeMode')
+          ..write('themeMode: $themeMode, ')
+          ..write('hasSeenTour: $hasSeenTour')
           ..write(')'))
         .toString();
   }
@@ -7310,6 +7364,7 @@ typedef $$AppSettingsTableCreateCompanionBuilder =
       Value<String?> bedtimeTarget,
       Value<String> weightUnit,
       Value<String> themeMode,
+      Value<bool> hasSeenTour,
     });
 typedef $$AppSettingsTableUpdateCompanionBuilder =
     AppSettingsCompanion Function({
@@ -7320,6 +7375,7 @@ typedef $$AppSettingsTableUpdateCompanionBuilder =
       Value<String?> bedtimeTarget,
       Value<String> weightUnit,
       Value<String> themeMode,
+      Value<bool> hasSeenTour,
     });
 
 class $$AppSettingsTableFilterComposer
@@ -7363,6 +7419,11 @@ class $$AppSettingsTableFilterComposer
 
   ColumnFilters<String> get themeMode => $composableBuilder(
     column: $table.themeMode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get hasSeenTour => $composableBuilder(
+    column: $table.hasSeenTour,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -7410,6 +7471,11 @@ class $$AppSettingsTableOrderingComposer
     column: $table.themeMode,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get hasSeenTour => $composableBuilder(
+    column: $table.hasSeenTour,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$AppSettingsTableAnnotationComposer
@@ -7451,6 +7517,11 @@ class $$AppSettingsTableAnnotationComposer
 
   GeneratedColumn<String> get themeMode =>
       $composableBuilder(column: $table.themeMode, builder: (column) => column);
+
+  GeneratedColumn<bool> get hasSeenTour => $composableBuilder(
+    column: $table.hasSeenTour,
+    builder: (column) => column,
+  );
 }
 
 class $$AppSettingsTableTableManager
@@ -7491,6 +7562,7 @@ class $$AppSettingsTableTableManager
                 Value<String?> bedtimeTarget = const Value.absent(),
                 Value<String> weightUnit = const Value.absent(),
                 Value<String> themeMode = const Value.absent(),
+                Value<bool> hasSeenTour = const Value.absent(),
               }) => AppSettingsCompanion(
                 id: id,
                 notifyDayBefore: notifyDayBefore,
@@ -7499,6 +7571,7 @@ class $$AppSettingsTableTableManager
                 bedtimeTarget: bedtimeTarget,
                 weightUnit: weightUnit,
                 themeMode: themeMode,
+                hasSeenTour: hasSeenTour,
               ),
           createCompanionCallback:
               ({
@@ -7509,6 +7582,7 @@ class $$AppSettingsTableTableManager
                 Value<String?> bedtimeTarget = const Value.absent(),
                 Value<String> weightUnit = const Value.absent(),
                 Value<String> themeMode = const Value.absent(),
+                Value<bool> hasSeenTour = const Value.absent(),
               }) => AppSettingsCompanion.insert(
                 id: id,
                 notifyDayBefore: notifyDayBefore,
@@ -7517,6 +7591,7 @@ class $$AppSettingsTableTableManager
                 bedtimeTarget: bedtimeTarget,
                 weightUnit: weightUnit,
                 themeMode: themeMode,
+                hasSeenTour: hasSeenTour,
               ),
           withReferenceMapper: (p0) => p0
               .map(
