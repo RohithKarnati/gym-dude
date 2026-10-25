@@ -1,8 +1,12 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/notification_helper.dart';
 import '../../providers/settings_providers.dart';
+import '../../services/backup_service.dart';
 import '../../services/notification_service.dart';
 import '../onboarding/onboarding_screen.dart';
 
@@ -28,6 +32,86 @@ class SettingsScreen extends ConsumerWidget {
       await setter(v);
       if (v) await NotificationService.instance.requestPermission();
       await applyNotificationSchedule(ref);
+    }
+
+    void snack(String msg) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(msg)));
+    }
+
+    Future<void> runBusy(Future<void> Function() work) async {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
+      );
+      try {
+        await work();
+        if (context.mounted) Navigator.of(context).pop(); // close spinner
+      } catch (e) {
+        if (context.mounted) Navigator.of(context).pop();
+        snack('$e');
+      }
+    }
+
+    Future<void> onExport() => runBusy(BackupService.exportAndShare);
+
+    Future<void> onImport() async {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (dctx) => AlertDialog(
+          title: const Text('Restore from backup?'),
+          content: const Text(
+            'This replaces ALL current data — your plan, logs, PRs, routine, '
+            'and photos — with the contents of the backup. This cannot be undone.',
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(dctx, false),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(dctx, true),
+                child: const Text('Choose file')),
+          ],
+        ),
+      );
+      if (ok != true || !context.mounted) return;
+
+      final picks = await FilePicker.pickFiles(type: FileType.any);
+      if (picks.isEmpty || picks.first.path == null) return;
+      final file = File(picks.first.path!);
+
+      var staged = true;
+      await runBusy(() async {
+        try {
+          await BackupService.stageRestoreFromZip(file);
+        } catch (_) {
+          staged = false;
+          rethrow; // runBusy shows the error snackbar
+        }
+      });
+      if (!staged || !context.mounted) return;
+      // The restore is staged; it's applied on next launch, so prompt a restart.
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dctx) => AlertDialog(
+          title: const Text('Backup restored 🎉'),
+          content: const Text(
+              'Gym Dude needs to close to finish restoring. Reopen it to see '
+              'your restored data.'),
+          actions: [
+            FilledButton(
+              // Force a full process exit so the next launch is a cold start —
+              // the restore is applied while the database opens. Finishing the
+              // activity alone can leave the process (and open DB) alive.
+              onPressed: () => exit(0),
+              child: const Text('Close Gym Dude'),
+            ),
+          ],
+        ),
+      );
     }
 
     return Scaffold(
@@ -124,6 +208,28 @@ class SettingsScreen extends ConsumerWidget {
                 "Today: don't forget creatine 💧 and beat last time 💪",
               );
             },
+          ),
+          const SizedBox(height: 24),
+
+          // --- Backup & restore ---
+          _SectionTitle('Backup & restore'),
+          const SizedBox(height: 4),
+          Text(
+            'A manual backup (database + progress photos) you can save anywhere '
+            'and restore on a new device. Separate from automatic Google backup.',
+            style: TextStyle(color: scheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.download_outlined),
+            label: const Text('Export backup'),
+            onPressed: onExport,
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.upload_outlined),
+            label: const Text('Import backup (replaces data)'),
+            onPressed: onImport,
           ),
           const SizedBox(height: 24),
 

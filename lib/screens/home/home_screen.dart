@@ -5,7 +5,9 @@ import 'package:intl/intl.dart';
 import '../../data/database.dart';
 import '../../providers/routine_providers.dart';
 import '../../providers/workout_providers.dart';
+import '../../utils/cardio.dart';
 import '../../utils/weekdays.dart';
+import '../../widgets/hydration_card.dart';
 import '../train/session_logger_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -41,6 +43,8 @@ class HomeScreen extends ConsumerWidget {
               _TodayCard(day: todayDay),
               const SizedBox(height: 16),
               const _RoutineProgressCard(),
+              const SizedBox(height: 16),
+              const HydrationCard(),
             ],
           );
         },
@@ -330,7 +334,7 @@ class _TargetLine extends ConsumerWidget {
           ),
           if (pr != null)
             Text(
-              '🎯 ${_fmtNum(pr.weightKg)}×${pr.reps}',
+              '🎯 ${pr.metric == null ? '${_fmtNum(pr.weightKg)}×${pr.reps}' : cardioSummary(pr.metric!, distanceKm: pr.distanceKm, durationSec: pr.durationSec, count: pr.reps)}',
               style: TextStyle(
                   color: scheme.onSurfaceVariant, fontWeight: FontWeight.w600),
             ),

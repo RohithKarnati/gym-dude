@@ -4,12 +4,24 @@ import 'database.dart';
 
 /// Outcome of logging a set that beat the exercise's existing record.
 class PrResult {
-  PrResult({required this.previous, required this.weightKg, required this.reps});
+  PrResult({
+    required this.previous,
+    required this.weightKg,
+    required this.reps,
+    this.metric,
+    this.distanceKm,
+    this.durationSec,
+  });
 
   /// The record that was beaten (null only when this is handled silently).
   final PersonalRecord? previous;
   final double weightKg;
   final int reps;
+
+  /// Cardio shape (null = classic weight × reps PR).
+  final String? metric; // distance | duration | count
+  final double? distanceKm;
+  final int? durationSec;
 }
 
 /// Reactive data access for the plan + logging core loop (F1 / F2).
@@ -92,6 +104,10 @@ class WorkoutDao {
     required int workoutDayId,
     required String name,
     required int targetSets,
+    String category = 'Other',
+    double? targetWeightKg,
+    String? cardioMetric,
+    bool trackPr = true,
   }) async {
     final existing = await getExercises(workoutDayId);
     final nextOrder = existing.isEmpty ? 0 : existing.last.orderIndex + 1;
@@ -99,7 +115,11 @@ class WorkoutDao {
           PlannedExercisesCompanion.insert(
             workoutDayId: workoutDayId,
             name: name,
+            category: Value(category),
             targetSets: Value(targetSets),
+            targetWeightKg: Value(targetWeightKg),
+            cardioMetric: Value(cardioMetric),
+            trackPr: Value(trackPr),
             orderIndex: Value(nextOrder),
           ),
         );
@@ -109,11 +129,19 @@ class WorkoutDao {
     required int id,
     required String name,
     required int targetSets,
+    String category = 'Other',
+    double? targetWeightKg,
+    String? cardioMetric,
+    bool trackPr = true,
   }) async {
     await (db.update(db.plannedExercises)..where((t) => t.id.equals(id))).write(
       PlannedExercisesCompanion(
         name: Value(name),
+        category: Value(category),
         targetSets: Value(targetSets),
+        targetWeightKg: Value(targetWeightKg),
+        cardioMetric: Value(cardioMetric),
+        trackPr: Value(trackPr),
       ),
     );
   }
@@ -171,6 +199,20 @@ class WorkoutDao {
     return q.watch();
   }
 
+  /// Mark a session finished (F: "Finish workout").
+  Future<void> finishSession(int sessionId) async {
+    await (db.update(db.workoutSessions)..where((t) => t.id.equals(sessionId)))
+        .write(WorkoutSessionsCompanion(completedAt: Value(DateTime.now())));
+  }
+
+  /// All sets in a session (any exercise) — used for the finish summary.
+  Future<List<SetLog>> getSetLogsForSession(int sessionId) {
+    final q = db.select(db.setLogs)
+      ..where((t) => t.sessionId.equals(sessionId))
+      ..orderBy([(t) => OrderingTerm(expression: t.setNumber)]);
+    return q.get();
+  }
+
   Stream<List<SetLog>> watchSetLogs(int sessionId) {
     final q = db.select(db.setLogs)
       ..where((t) => t.sessionId.equals(sessionId))
@@ -189,18 +231,26 @@ class WorkoutDao {
     return q.watch();
   }
 
-  /// Log a set. Detects a new personal record (F3): returns a [PrResult] when
-  /// this set beats the exercise's existing record, otherwise null.
+  /// Log a set. Detects a new personal record (F3): returns a [PrResult] (which
+  /// drives the celebration) only when the top-set **weight** goes up.
   ///
-  /// PR rule: beats the record if `weight > best.weight`, or
-  /// `weight == best.weight && reps > best.reps`. The very first set for an
-  /// exercise seeds the record silently (no celebration).
+  /// Rules:
+  /// - Heavier weight than the current best → celebrated PR (returns a result,
+  ///   flags the set).
+  /// - More reps at the same weight → still updates the tracked best so the
+  ///   "beat this" target stays accurate, but **no celebration** (returns null).
+  /// - The very first set for an exercise seeds the record silently.
   Future<PrResult?> addSetLog({
     required int sessionId,
     required String exerciseName,
     required double weightKg,
     required int reps,
     double? rpe,
+    String category = 'Other',
+    String? metric, // null = strength; distance | duration | count for cardio
+    double? distanceKm,
+    int? durationSec,
+    bool trackPr = true,
   }) async {
     final prior = await (db.select(db.setLogs)
           ..where((t) =>
@@ -209,12 +259,47 @@ class WorkoutDao {
         .get();
     final nextSetNumber = prior.length + 1;
 
-    final existingPr = await getPr(exerciseName);
-    final beatsRecord = existingPr != null &&
-        (weightKg > existingPr.weightKg ||
-            (weightKg == existingPr.weightKg && reps > existingPr.reps));
+    // PR tracking disabled for this exercise: log the set plainly, never flag
+    // it, celebrate it, or touch the personal-records table.
+    if (!trackPr) {
+      await db.into(db.setLogs).insert(
+            SetLogsCompanion.insert(
+              sessionId: sessionId,
+              exerciseName: exerciseName,
+              setNumber: nextSetNumber,
+              weightKg: weightKg,
+              reps: reps,
+              rpe: Value(rpe),
+              distanceKm: Value(distanceKm),
+              durationSec: Value(durationSec),
+              isPr: const Value(false),
+            ),
+          );
+      return null;
+    }
+
+    final storedPr = await getPr(exerciseName);
+    // A record of a different shape (switched strength<->cardio, or metric
+    // changed) doesn't compare — treat as the first of its kind.
+    final existingPr = (storedPr != null && storedPr.metric == metric)
+        ? storedPr
+        : null;
     final isFirstEver = existingPr == null;
-    final isPr = beatsRecord; // first-ever seeds silently, no celebration
+
+    bool beats = false; // celebrate + flag the set
+    bool silentImprove = false; // update tracked best, no celebration
+    if (existingPr != null) {
+      if (metric == null) {
+        if (weightKg > existingPr.weightKg) {
+          beats = true;
+        } else if (weightKg == existingPr.weightKg && reps > existingPr.reps) {
+          silentImprove = true;
+        }
+      } else {
+        beats = _cardioBeats(metric, existingPr, distanceKm, durationSec, reps);
+      }
+    }
+    final isPr = beats;
 
     await db.into(db.setLogs).insert(
           SetLogsCompanion.insert(
@@ -224,29 +309,76 @@ class WorkoutDao {
             weightKg: weightKg,
             reps: reps,
             rpe: Value(rpe),
+            distanceKm: Value(distanceKm),
+            durationSec: Value(durationSec),
             isPr: Value(isPr),
           ),
         );
 
-    if (isFirstEver) {
-      await _upsertPr(exerciseName, weightKg, reps);
-      return null;
+    if (isFirstEver || beats || silentImprove) {
+      await _upsertPr(exerciseName, weightKg, reps, category,
+          metric: metric, distanceKm: distanceKm, durationSec: durationSec);
     }
-    if (beatsRecord) {
-      await _upsertPr(exerciseName, weightKg, reps);
-      return PrResult(previous: existingPr, weightKg: weightKg, reps: reps);
+    if (beats) {
+      return PrResult(
+        previous: existingPr,
+        weightKg: weightKg,
+        reps: reps,
+        metric: metric,
+        distanceKm: distanceKm,
+        durationSec: durationSec,
+      );
     }
     return null;
   }
 
-  Future<void> _upsertPr(String exerciseName, double weightKg, int reps) async {
+  /// Cardio PR rule: more distance (tie → faster time), more duration, or a
+  /// higher count all count as beating the record.
+  bool _cardioBeats(
+    String metric,
+    PersonalRecord pr,
+    double? distanceKm,
+    int? durationSec,
+    int count,
+  ) {
+    switch (metric) {
+      case 'distance':
+        final best = pr.distanceKm ?? 0;
+        final d = distanceKm ?? 0;
+        if (d > best) return true;
+        // Same distance, faster time (both times known).
+        return d == best &&
+            durationSec != null &&
+            pr.durationSec != null &&
+            durationSec < pr.durationSec!;
+      case 'duration':
+        return (durationSec ?? 0) > (pr.durationSec ?? 0);
+      case 'count':
+        return count > pr.reps;
+    }
+    return false;
+  }
+
+  Future<void> _upsertPr(
+    String exerciseName,
+    double weightKg,
+    int reps,
+    String category, {
+    String? metric,
+    double? distanceKm,
+    int? durationSec,
+  }) async {
     final existing = await getPr(exerciseName);
     if (existing == null) {
       await db.into(db.personalRecords).insert(
             PersonalRecordsCompanion.insert(
               exerciseName: exerciseName,
+              category: Value(category),
               weightKg: weightKg,
               reps: reps,
+              metric: Value(metric),
+              distanceKm: Value(distanceKm),
+              durationSec: Value(durationSec),
               achievedAt: DateTime.now(),
             ),
           );
@@ -255,8 +387,12 @@ class WorkoutDao {
             ..where((t) => t.id.equals(existing.id)))
           .write(
         PersonalRecordsCompanion(
+          category: Value(category),
           weightKg: Value(weightKg),
           reps: Value(reps),
+          metric: Value(metric),
+          distanceKm: Value(distanceKm),
+          durationSec: Value(durationSec),
           achievedAt: Value(DateTime.now()),
         ),
       );

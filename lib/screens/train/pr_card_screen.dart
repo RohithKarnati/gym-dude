@@ -9,6 +9,7 @@ import 'package:screenshot/screenshot.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../data/database.dart';
+import '../../utils/cardio.dart';
 
 /// Visual styles for the shareable PR card (F4). Each lays the same facts out
 /// differently and adapts when a background photo is added.
@@ -72,11 +73,18 @@ class _PrCardScreenState extends State<PrCardScreen> {
           pr.exerciseName.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_');
       final file = File(p.join(dir.path, 'pr_${safeName}_${_template.name}.png'));
       await file.writeAsBytes(bytes);
+      final summary = pr.metric == null
+          ? '${_fmt(pr.weightKg)}kg × ${pr.reps}'
+          : cardioSummary(
+              pr.metric!,
+              distanceKm: pr.distanceKm,
+              durationSec: pr.durationSec,
+              count: pr.reps,
+            );
       await SharePlus.instance.share(
         ShareParams(
           files: [XFile(file.path)],
-          text:
-              'New PR: ${pr.exerciseName} — ${_fmt(pr.weightKg)}kg × ${pr.reps} 💪 #GymDude',
+          text: 'New PR: ${pr.exerciseName} — $summary 💪 #GymDude',
         ),
       );
     } catch (e) {
@@ -275,7 +283,7 @@ class PrShareCard extends StatelessWidget {
                             textBaseline: TextBaseline.alphabetic,
                             children: [
                               Text(
-                                _fmt(pr.weightKg),
+                                _bigValue(pr),
                                 style: TextStyle(
                                   color: style.text,
                                   fontSize: 66,
@@ -286,19 +294,21 @@ class PrShareCard extends StatelessWidget {
                               const SizedBox(width: 6),
                               Padding(
                                 padding: const EdgeInsets.only(bottom: 8),
-                                child: Text('kg',
+                                child: Text(_bigUnit(pr),
                                     style: TextStyle(
                                         color: style.textFaint, fontSize: 24)),
                               ),
-                              const SizedBox(width: 14),
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: Text('× ${pr.reps}',
-                                    style: TextStyle(
-                                        color: style.accent,
-                                        fontSize: 30,
-                                        fontWeight: FontWeight.w800)),
-                              ),
+                              if (_bigSecondary(pr) != null) ...[
+                                const SizedBox(width: 14),
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: Text(_bigSecondary(pr)!,
+                                      style: TextStyle(
+                                          color: style.accent,
+                                          fontSize: 30,
+                                          fontWeight: FontWeight.w800)),
+                                ),
+                              ],
                             ],
                           ),
                         ],
@@ -434,6 +444,45 @@ class _CardStyle {
           trophySize: 30,
         );
     }
+  }
+}
+
+String _bigValue(PersonalRecord pr) {
+  switch (pr.metric) {
+    case 'distance':
+      return _fmt(pr.distanceKm ?? 0);
+    case 'duration':
+      return '${((pr.durationSec ?? 0) / 60).round()}';
+    case 'count':
+      return '${pr.reps}';
+    default:
+      return _fmt(pr.weightKg);
+  }
+}
+
+String _bigUnit(PersonalRecord pr) {
+  switch (pr.metric) {
+    case 'distance':
+      return 'km';
+    case 'duration':
+      return 'min';
+    case 'count':
+      return 'reps';
+    default:
+      return 'kg';
+  }
+}
+
+String? _bigSecondary(PersonalRecord pr) {
+  switch (pr.metric) {
+    case 'distance':
+      final d = pr.durationSec;
+      return (d != null && d > 0) ? fmtDuration(d) : null;
+    case 'duration':
+    case 'count':
+      return null;
+    default:
+      return '× ${pr.reps}';
   }
 }
 

@@ -23,14 +23,12 @@ void main() {
               .overrideWith((ref) => Stream.value(null)),
           trainingStatsProvider
               .overrideWith((ref) => Stream.value(TrainingStats.empty)),
-          routineItemsProvider
+          allRoutineItemsProvider
               .overrideWith((ref) => Stream.value(const <RoutineItem>[])),
           routineChecksTodayProvider
               .overrideWith((ref) => Stream.value(const <RoutineCheck>[])),
-          mealPrepTasksProvider
-              .overrideWith((ref) => Stream.value(const <MealPrepTask>[])),
-          mealPrepChecksThisWeekProvider
-              .overrideWith((ref) => Stream.value(const <MealPrepCheck>[])),
+          routineListsProvider
+              .overrideWith((ref) => Stream.value(const <RoutineList>[])),
         ],
         child: const GymDudeApp(),
       ),
