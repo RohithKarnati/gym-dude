@@ -397,6 +397,18 @@ class $PlannedExercisesTable extends PlannedExercises
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _categoryMeta = const VerificationMeta(
+    'category',
+  );
+  @override
+  late final GeneratedColumn<String> category = GeneratedColumn<String>(
+    'category',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('Other'),
+  );
   static const VerificationMeta _targetSetsMeta = const VerificationMeta(
     'targetSets',
   );
@@ -408,6 +420,43 @@ class $PlannedExercisesTable extends PlannedExercises
     type: DriftSqlType.int,
     requiredDuringInsert: false,
     defaultValue: const Constant(3),
+  );
+  static const VerificationMeta _targetWeightKgMeta = const VerificationMeta(
+    'targetWeightKg',
+  );
+  @override
+  late final GeneratedColumn<double> targetWeightKg = GeneratedColumn<double>(
+    'target_weight_kg',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _cardioMetricMeta = const VerificationMeta(
+    'cardioMetric',
+  );
+  @override
+  late final GeneratedColumn<String> cardioMetric = GeneratedColumn<String>(
+    'cardio_metric',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _trackPrMeta = const VerificationMeta(
+    'trackPr',
+  );
+  @override
+  late final GeneratedColumn<bool> trackPr = GeneratedColumn<bool>(
+    'track_pr',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("track_pr" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
   );
   static const VerificationMeta _orderIndexMeta = const VerificationMeta(
     'orderIndex',
@@ -426,7 +475,11 @@ class $PlannedExercisesTable extends PlannedExercises
     id,
     workoutDayId,
     name,
+    category,
     targetSets,
+    targetWeightKg,
+    cardioMetric,
+    trackPr,
     orderIndex,
   ];
   @override
@@ -463,10 +516,40 @@ class $PlannedExercisesTable extends PlannedExercises
     } else if (isInserting) {
       context.missing(_nameMeta);
     }
+    if (data.containsKey('category')) {
+      context.handle(
+        _categoryMeta,
+        category.isAcceptableOrUnknown(data['category']!, _categoryMeta),
+      );
+    }
     if (data.containsKey('target_sets')) {
       context.handle(
         _targetSetsMeta,
         targetSets.isAcceptableOrUnknown(data['target_sets']!, _targetSetsMeta),
+      );
+    }
+    if (data.containsKey('target_weight_kg')) {
+      context.handle(
+        _targetWeightKgMeta,
+        targetWeightKg.isAcceptableOrUnknown(
+          data['target_weight_kg']!,
+          _targetWeightKgMeta,
+        ),
+      );
+    }
+    if (data.containsKey('cardio_metric')) {
+      context.handle(
+        _cardioMetricMeta,
+        cardioMetric.isAcceptableOrUnknown(
+          data['cardio_metric']!,
+          _cardioMetricMeta,
+        ),
+      );
+    }
+    if (data.containsKey('track_pr')) {
+      context.handle(
+        _trackPrMeta,
+        trackPr.isAcceptableOrUnknown(data['track_pr']!, _trackPrMeta),
       );
     }
     if (data.containsKey('order_index')) {
@@ -496,9 +579,25 @@ class $PlannedExercisesTable extends PlannedExercises
         DriftSqlType.string,
         data['${effectivePrefix}name'],
       )!,
+      category: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}category'],
+      )!,
       targetSets: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}target_sets'],
+      )!,
+      targetWeightKg: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}target_weight_kg'],
+      ),
+      cardioMetric: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}cardio_metric'],
+      ),
+      trackPr: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}track_pr'],
       )!,
       orderIndex: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
@@ -517,13 +616,28 @@ class PlannedExercise extends DataClass implements Insertable<PlannedExercise> {
   final int id;
   final int workoutDayId;
   final String name;
+  final String category;
   final int targetSets;
+  final double? targetWeightKg;
+
+  /// Cardio logging mode: null = strength (weight × reps); otherwise one of
+  /// 'distance' (km), 'duration' (minutes), 'count' (e.g. skips).
+  final String? cardioMetric;
+
+  /// Whether a new best set should be detected and celebrated as a personal
+  /// record. On by default; turn off for exercises you don't want PR noise on
+  /// (warm-ups, machine/accessory work). Sets still log normally either way.
+  final bool trackPr;
   final int orderIndex;
   const PlannedExercise({
     required this.id,
     required this.workoutDayId,
     required this.name,
+    required this.category,
     required this.targetSets,
+    this.targetWeightKg,
+    this.cardioMetric,
+    required this.trackPr,
     required this.orderIndex,
   });
   @override
@@ -532,7 +646,15 @@ class PlannedExercise extends DataClass implements Insertable<PlannedExercise> {
     map['id'] = Variable<int>(id);
     map['workout_day_id'] = Variable<int>(workoutDayId);
     map['name'] = Variable<String>(name);
+    map['category'] = Variable<String>(category);
     map['target_sets'] = Variable<int>(targetSets);
+    if (!nullToAbsent || targetWeightKg != null) {
+      map['target_weight_kg'] = Variable<double>(targetWeightKg);
+    }
+    if (!nullToAbsent || cardioMetric != null) {
+      map['cardio_metric'] = Variable<String>(cardioMetric);
+    }
+    map['track_pr'] = Variable<bool>(trackPr);
     map['order_index'] = Variable<int>(orderIndex);
     return map;
   }
@@ -542,7 +664,15 @@ class PlannedExercise extends DataClass implements Insertable<PlannedExercise> {
       id: Value(id),
       workoutDayId: Value(workoutDayId),
       name: Value(name),
+      category: Value(category),
       targetSets: Value(targetSets),
+      targetWeightKg: targetWeightKg == null && nullToAbsent
+          ? const Value.absent()
+          : Value(targetWeightKg),
+      cardioMetric: cardioMetric == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cardioMetric),
+      trackPr: Value(trackPr),
       orderIndex: Value(orderIndex),
     );
   }
@@ -556,7 +686,11 @@ class PlannedExercise extends DataClass implements Insertable<PlannedExercise> {
       id: serializer.fromJson<int>(json['id']),
       workoutDayId: serializer.fromJson<int>(json['workoutDayId']),
       name: serializer.fromJson<String>(json['name']),
+      category: serializer.fromJson<String>(json['category']),
       targetSets: serializer.fromJson<int>(json['targetSets']),
+      targetWeightKg: serializer.fromJson<double?>(json['targetWeightKg']),
+      cardioMetric: serializer.fromJson<String?>(json['cardioMetric']),
+      trackPr: serializer.fromJson<bool>(json['trackPr']),
       orderIndex: serializer.fromJson<int>(json['orderIndex']),
     );
   }
@@ -567,7 +701,11 @@ class PlannedExercise extends DataClass implements Insertable<PlannedExercise> {
       'id': serializer.toJson<int>(id),
       'workoutDayId': serializer.toJson<int>(workoutDayId),
       'name': serializer.toJson<String>(name),
+      'category': serializer.toJson<String>(category),
       'targetSets': serializer.toJson<int>(targetSets),
+      'targetWeightKg': serializer.toJson<double?>(targetWeightKg),
+      'cardioMetric': serializer.toJson<String?>(cardioMetric),
+      'trackPr': serializer.toJson<bool>(trackPr),
       'orderIndex': serializer.toJson<int>(orderIndex),
     };
   }
@@ -576,13 +714,23 @@ class PlannedExercise extends DataClass implements Insertable<PlannedExercise> {
     int? id,
     int? workoutDayId,
     String? name,
+    String? category,
     int? targetSets,
+    Value<double?> targetWeightKg = const Value.absent(),
+    Value<String?> cardioMetric = const Value.absent(),
+    bool? trackPr,
     int? orderIndex,
   }) => PlannedExercise(
     id: id ?? this.id,
     workoutDayId: workoutDayId ?? this.workoutDayId,
     name: name ?? this.name,
+    category: category ?? this.category,
     targetSets: targetSets ?? this.targetSets,
+    targetWeightKg: targetWeightKg.present
+        ? targetWeightKg.value
+        : this.targetWeightKg,
+    cardioMetric: cardioMetric.present ? cardioMetric.value : this.cardioMetric,
+    trackPr: trackPr ?? this.trackPr,
     orderIndex: orderIndex ?? this.orderIndex,
   );
   PlannedExercise copyWithCompanion(PlannedExercisesCompanion data) {
@@ -592,9 +740,17 @@ class PlannedExercise extends DataClass implements Insertable<PlannedExercise> {
           ? data.workoutDayId.value
           : this.workoutDayId,
       name: data.name.present ? data.name.value : this.name,
+      category: data.category.present ? data.category.value : this.category,
       targetSets: data.targetSets.present
           ? data.targetSets.value
           : this.targetSets,
+      targetWeightKg: data.targetWeightKg.present
+          ? data.targetWeightKg.value
+          : this.targetWeightKg,
+      cardioMetric: data.cardioMetric.present
+          ? data.cardioMetric.value
+          : this.cardioMetric,
+      trackPr: data.trackPr.present ? data.trackPr.value : this.trackPr,
       orderIndex: data.orderIndex.present
           ? data.orderIndex.value
           : this.orderIndex,
@@ -607,15 +763,28 @@ class PlannedExercise extends DataClass implements Insertable<PlannedExercise> {
           ..write('id: $id, ')
           ..write('workoutDayId: $workoutDayId, ')
           ..write('name: $name, ')
+          ..write('category: $category, ')
           ..write('targetSets: $targetSets, ')
+          ..write('targetWeightKg: $targetWeightKg, ')
+          ..write('cardioMetric: $cardioMetric, ')
+          ..write('trackPr: $trackPr, ')
           ..write('orderIndex: $orderIndex')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, workoutDayId, name, targetSets, orderIndex);
+  int get hashCode => Object.hash(
+    id,
+    workoutDayId,
+    name,
+    category,
+    targetSets,
+    targetWeightKg,
+    cardioMetric,
+    trackPr,
+    orderIndex,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -623,7 +792,11 @@ class PlannedExercise extends DataClass implements Insertable<PlannedExercise> {
           other.id == this.id &&
           other.workoutDayId == this.workoutDayId &&
           other.name == this.name &&
+          other.category == this.category &&
           other.targetSets == this.targetSets &&
+          other.targetWeightKg == this.targetWeightKg &&
+          other.cardioMetric == this.cardioMetric &&
+          other.trackPr == this.trackPr &&
           other.orderIndex == this.orderIndex);
 }
 
@@ -631,20 +804,32 @@ class PlannedExercisesCompanion extends UpdateCompanion<PlannedExercise> {
   final Value<int> id;
   final Value<int> workoutDayId;
   final Value<String> name;
+  final Value<String> category;
   final Value<int> targetSets;
+  final Value<double?> targetWeightKg;
+  final Value<String?> cardioMetric;
+  final Value<bool> trackPr;
   final Value<int> orderIndex;
   const PlannedExercisesCompanion({
     this.id = const Value.absent(),
     this.workoutDayId = const Value.absent(),
     this.name = const Value.absent(),
+    this.category = const Value.absent(),
     this.targetSets = const Value.absent(),
+    this.targetWeightKg = const Value.absent(),
+    this.cardioMetric = const Value.absent(),
+    this.trackPr = const Value.absent(),
     this.orderIndex = const Value.absent(),
   });
   PlannedExercisesCompanion.insert({
     this.id = const Value.absent(),
     required int workoutDayId,
     required String name,
+    this.category = const Value.absent(),
     this.targetSets = const Value.absent(),
+    this.targetWeightKg = const Value.absent(),
+    this.cardioMetric = const Value.absent(),
+    this.trackPr = const Value.absent(),
     this.orderIndex = const Value.absent(),
   }) : workoutDayId = Value(workoutDayId),
        name = Value(name);
@@ -652,14 +837,22 @@ class PlannedExercisesCompanion extends UpdateCompanion<PlannedExercise> {
     Expression<int>? id,
     Expression<int>? workoutDayId,
     Expression<String>? name,
+    Expression<String>? category,
     Expression<int>? targetSets,
+    Expression<double>? targetWeightKg,
+    Expression<String>? cardioMetric,
+    Expression<bool>? trackPr,
     Expression<int>? orderIndex,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (workoutDayId != null) 'workout_day_id': workoutDayId,
       if (name != null) 'name': name,
+      if (category != null) 'category': category,
       if (targetSets != null) 'target_sets': targetSets,
+      if (targetWeightKg != null) 'target_weight_kg': targetWeightKg,
+      if (cardioMetric != null) 'cardio_metric': cardioMetric,
+      if (trackPr != null) 'track_pr': trackPr,
       if (orderIndex != null) 'order_index': orderIndex,
     });
   }
@@ -668,14 +861,22 @@ class PlannedExercisesCompanion extends UpdateCompanion<PlannedExercise> {
     Value<int>? id,
     Value<int>? workoutDayId,
     Value<String>? name,
+    Value<String>? category,
     Value<int>? targetSets,
+    Value<double?>? targetWeightKg,
+    Value<String?>? cardioMetric,
+    Value<bool>? trackPr,
     Value<int>? orderIndex,
   }) {
     return PlannedExercisesCompanion(
       id: id ?? this.id,
       workoutDayId: workoutDayId ?? this.workoutDayId,
       name: name ?? this.name,
+      category: category ?? this.category,
       targetSets: targetSets ?? this.targetSets,
+      targetWeightKg: targetWeightKg ?? this.targetWeightKg,
+      cardioMetric: cardioMetric ?? this.cardioMetric,
+      trackPr: trackPr ?? this.trackPr,
       orderIndex: orderIndex ?? this.orderIndex,
     );
   }
@@ -692,8 +893,20 @@ class PlannedExercisesCompanion extends UpdateCompanion<PlannedExercise> {
     if (name.present) {
       map['name'] = Variable<String>(name.value);
     }
+    if (category.present) {
+      map['category'] = Variable<String>(category.value);
+    }
     if (targetSets.present) {
       map['target_sets'] = Variable<int>(targetSets.value);
+    }
+    if (targetWeightKg.present) {
+      map['target_weight_kg'] = Variable<double>(targetWeightKg.value);
+    }
+    if (cardioMetric.present) {
+      map['cardio_metric'] = Variable<String>(cardioMetric.value);
+    }
+    if (trackPr.present) {
+      map['track_pr'] = Variable<bool>(trackPr.value);
     }
     if (orderIndex.present) {
       map['order_index'] = Variable<int>(orderIndex.value);
@@ -707,7 +920,11 @@ class PlannedExercisesCompanion extends UpdateCompanion<PlannedExercise> {
           ..write('id: $id, ')
           ..write('workoutDayId: $workoutDayId, ')
           ..write('name: $name, ')
+          ..write('category: $category, ')
           ..write('targetSets: $targetSets, ')
+          ..write('targetWeightKg: $targetWeightKg, ')
+          ..write('cardioMetric: $cardioMetric, ')
+          ..write('trackPr: $trackPr, ')
           ..write('orderIndex: $orderIndex')
           ..write(')'))
         .toString();
@@ -765,8 +982,25 @@ class $WorkoutSessionsTable extends WorkoutSessions
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _completedAtMeta = const VerificationMeta(
+    'completedAt',
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, workoutDayId, date, notes];
+  late final GeneratedColumn<DateTime> completedAt = GeneratedColumn<DateTime>(
+    'completed_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    workoutDayId,
+    date,
+    notes,
+    completedAt,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -807,6 +1041,15 @@ class $WorkoutSessionsTable extends WorkoutSessions
         notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
       );
     }
+    if (data.containsKey('completed_at')) {
+      context.handle(
+        _completedAtMeta,
+        completedAt.isAcceptableOrUnknown(
+          data['completed_at']!,
+          _completedAtMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -832,6 +1075,10 @@ class $WorkoutSessionsTable extends WorkoutSessions
         DriftSqlType.string,
         data['${effectivePrefix}notes'],
       ),
+      completedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}completed_at'],
+      ),
     );
   }
 
@@ -846,11 +1093,15 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
   final int workoutDayId;
   final DateTime date;
   final String? notes;
+
+  /// Set when the user taps "Finish workout"; null while still in progress.
+  final DateTime? completedAt;
   const WorkoutSession({
     required this.id,
     required this.workoutDayId,
     required this.date,
     this.notes,
+    this.completedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -860,6 +1111,9 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
     map['date'] = Variable<DateTime>(date);
     if (!nullToAbsent || notes != null) {
       map['notes'] = Variable<String>(notes);
+    }
+    if (!nullToAbsent || completedAt != null) {
+      map['completed_at'] = Variable<DateTime>(completedAt);
     }
     return map;
   }
@@ -872,6 +1126,9 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
       notes: notes == null && nullToAbsent
           ? const Value.absent()
           : Value(notes),
+      completedAt: completedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(completedAt),
     );
   }
 
@@ -885,6 +1142,7 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
       workoutDayId: serializer.fromJson<int>(json['workoutDayId']),
       date: serializer.fromJson<DateTime>(json['date']),
       notes: serializer.fromJson<String?>(json['notes']),
+      completedAt: serializer.fromJson<DateTime?>(json['completedAt']),
     );
   }
   @override
@@ -895,6 +1153,7 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
       'workoutDayId': serializer.toJson<int>(workoutDayId),
       'date': serializer.toJson<DateTime>(date),
       'notes': serializer.toJson<String?>(notes),
+      'completedAt': serializer.toJson<DateTime?>(completedAt),
     };
   }
 
@@ -903,11 +1162,13 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
     int? workoutDayId,
     DateTime? date,
     Value<String?> notes = const Value.absent(),
+    Value<DateTime?> completedAt = const Value.absent(),
   }) => WorkoutSession(
     id: id ?? this.id,
     workoutDayId: workoutDayId ?? this.workoutDayId,
     date: date ?? this.date,
     notes: notes.present ? notes.value : this.notes,
+    completedAt: completedAt.present ? completedAt.value : this.completedAt,
   );
   WorkoutSession copyWithCompanion(WorkoutSessionsCompanion data) {
     return WorkoutSession(
@@ -917,6 +1178,9 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
           : this.workoutDayId,
       date: data.date.present ? data.date.value : this.date,
       notes: data.notes.present ? data.notes.value : this.notes,
+      completedAt: data.completedAt.present
+          ? data.completedAt.value
+          : this.completedAt,
     );
   }
 
@@ -926,13 +1190,14 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
           ..write('id: $id, ')
           ..write('workoutDayId: $workoutDayId, ')
           ..write('date: $date, ')
-          ..write('notes: $notes')
+          ..write('notes: $notes, ')
+          ..write('completedAt: $completedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, workoutDayId, date, notes);
+  int get hashCode => Object.hash(id, workoutDayId, date, notes, completedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -940,7 +1205,8 @@ class WorkoutSession extends DataClass implements Insertable<WorkoutSession> {
           other.id == this.id &&
           other.workoutDayId == this.workoutDayId &&
           other.date == this.date &&
-          other.notes == this.notes);
+          other.notes == this.notes &&
+          other.completedAt == this.completedAt);
 }
 
 class WorkoutSessionsCompanion extends UpdateCompanion<WorkoutSession> {
@@ -948,17 +1214,20 @@ class WorkoutSessionsCompanion extends UpdateCompanion<WorkoutSession> {
   final Value<int> workoutDayId;
   final Value<DateTime> date;
   final Value<String?> notes;
+  final Value<DateTime?> completedAt;
   const WorkoutSessionsCompanion({
     this.id = const Value.absent(),
     this.workoutDayId = const Value.absent(),
     this.date = const Value.absent(),
     this.notes = const Value.absent(),
+    this.completedAt = const Value.absent(),
   });
   WorkoutSessionsCompanion.insert({
     this.id = const Value.absent(),
     required int workoutDayId,
     required DateTime date,
     this.notes = const Value.absent(),
+    this.completedAt = const Value.absent(),
   }) : workoutDayId = Value(workoutDayId),
        date = Value(date);
   static Insertable<WorkoutSession> custom({
@@ -966,12 +1235,14 @@ class WorkoutSessionsCompanion extends UpdateCompanion<WorkoutSession> {
     Expression<int>? workoutDayId,
     Expression<DateTime>? date,
     Expression<String>? notes,
+    Expression<DateTime>? completedAt,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (workoutDayId != null) 'workout_day_id': workoutDayId,
       if (date != null) 'date': date,
       if (notes != null) 'notes': notes,
+      if (completedAt != null) 'completed_at': completedAt,
     });
   }
 
@@ -980,12 +1251,14 @@ class WorkoutSessionsCompanion extends UpdateCompanion<WorkoutSession> {
     Value<int>? workoutDayId,
     Value<DateTime>? date,
     Value<String?>? notes,
+    Value<DateTime?>? completedAt,
   }) {
     return WorkoutSessionsCompanion(
       id: id ?? this.id,
       workoutDayId: workoutDayId ?? this.workoutDayId,
       date: date ?? this.date,
       notes: notes ?? this.notes,
+      completedAt: completedAt ?? this.completedAt,
     );
   }
 
@@ -1004,6 +1277,9 @@ class WorkoutSessionsCompanion extends UpdateCompanion<WorkoutSession> {
     if (notes.present) {
       map['notes'] = Variable<String>(notes.value);
     }
+    if (completedAt.present) {
+      map['completed_at'] = Variable<DateTime>(completedAt.value);
+    }
     return map;
   }
 
@@ -1013,7 +1289,8 @@ class WorkoutSessionsCompanion extends UpdateCompanion<WorkoutSession> {
           ..write('id: $id, ')
           ..write('workoutDayId: $workoutDayId, ')
           ..write('date: $date, ')
-          ..write('notes: $notes')
+          ..write('notes: $notes, ')
+          ..write('completedAt: $completedAt')
           ..write(')'))
         .toString();
   }
@@ -1102,6 +1379,28 @@ class $SetLogsTable extends SetLogs with TableInfo<$SetLogsTable, SetLog> {
     type: DriftSqlType.double,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _distanceKmMeta = const VerificationMeta(
+    'distanceKm',
+  );
+  @override
+  late final GeneratedColumn<double> distanceKm = GeneratedColumn<double>(
+    'distance_km',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _durationSecMeta = const VerificationMeta(
+    'durationSec',
+  );
+  @override
+  late final GeneratedColumn<int> durationSec = GeneratedColumn<int>(
+    'duration_sec',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _isPrMeta = const VerificationMeta('isPr');
   @override
   late final GeneratedColumn<bool> isPr = GeneratedColumn<bool>(
@@ -1124,6 +1423,8 @@ class $SetLogsTable extends SetLogs with TableInfo<$SetLogsTable, SetLog> {
     weightKg,
     reps,
     rpe,
+    distanceKm,
+    durationSec,
     isPr,
   ];
   @override
@@ -1190,6 +1491,21 @@ class $SetLogsTable extends SetLogs with TableInfo<$SetLogsTable, SetLog> {
         rpe.isAcceptableOrUnknown(data['rpe']!, _rpeMeta),
       );
     }
+    if (data.containsKey('distance_km')) {
+      context.handle(
+        _distanceKmMeta,
+        distanceKm.isAcceptableOrUnknown(data['distance_km']!, _distanceKmMeta),
+      );
+    }
+    if (data.containsKey('duration_sec')) {
+      context.handle(
+        _durationSecMeta,
+        durationSec.isAcceptableOrUnknown(
+          data['duration_sec']!,
+          _durationSecMeta,
+        ),
+      );
+    }
     if (data.containsKey('is_pr')) {
       context.handle(
         _isPrMeta,
@@ -1233,6 +1549,14 @@ class $SetLogsTable extends SetLogs with TableInfo<$SetLogsTable, SetLog> {
         DriftSqlType.double,
         data['${effectivePrefix}rpe'],
       ),
+      distanceKm: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}distance_km'],
+      ),
+      durationSec: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}duration_sec'],
+      ),
       isPr: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_pr'],
@@ -1254,6 +1578,8 @@ class SetLog extends DataClass implements Insertable<SetLog> {
   final double weightKg;
   final int reps;
   final double? rpe;
+  final double? distanceKm;
+  final int? durationSec;
   final bool isPr;
   const SetLog({
     required this.id,
@@ -1263,6 +1589,8 @@ class SetLog extends DataClass implements Insertable<SetLog> {
     required this.weightKg,
     required this.reps,
     this.rpe,
+    this.distanceKm,
+    this.durationSec,
     required this.isPr,
   });
   @override
@@ -1277,6 +1605,12 @@ class SetLog extends DataClass implements Insertable<SetLog> {
     if (!nullToAbsent || rpe != null) {
       map['rpe'] = Variable<double>(rpe);
     }
+    if (!nullToAbsent || distanceKm != null) {
+      map['distance_km'] = Variable<double>(distanceKm);
+    }
+    if (!nullToAbsent || durationSec != null) {
+      map['duration_sec'] = Variable<int>(durationSec);
+    }
     map['is_pr'] = Variable<bool>(isPr);
     return map;
   }
@@ -1290,6 +1624,12 @@ class SetLog extends DataClass implements Insertable<SetLog> {
       weightKg: Value(weightKg),
       reps: Value(reps),
       rpe: rpe == null && nullToAbsent ? const Value.absent() : Value(rpe),
+      distanceKm: distanceKm == null && nullToAbsent
+          ? const Value.absent()
+          : Value(distanceKm),
+      durationSec: durationSec == null && nullToAbsent
+          ? const Value.absent()
+          : Value(durationSec),
       isPr: Value(isPr),
     );
   }
@@ -1307,6 +1647,8 @@ class SetLog extends DataClass implements Insertable<SetLog> {
       weightKg: serializer.fromJson<double>(json['weightKg']),
       reps: serializer.fromJson<int>(json['reps']),
       rpe: serializer.fromJson<double?>(json['rpe']),
+      distanceKm: serializer.fromJson<double?>(json['distanceKm']),
+      durationSec: serializer.fromJson<int?>(json['durationSec']),
       isPr: serializer.fromJson<bool>(json['isPr']),
     );
   }
@@ -1321,6 +1663,8 @@ class SetLog extends DataClass implements Insertable<SetLog> {
       'weightKg': serializer.toJson<double>(weightKg),
       'reps': serializer.toJson<int>(reps),
       'rpe': serializer.toJson<double?>(rpe),
+      'distanceKm': serializer.toJson<double?>(distanceKm),
+      'durationSec': serializer.toJson<int?>(durationSec),
       'isPr': serializer.toJson<bool>(isPr),
     };
   }
@@ -1333,6 +1677,8 @@ class SetLog extends DataClass implements Insertable<SetLog> {
     double? weightKg,
     int? reps,
     Value<double?> rpe = const Value.absent(),
+    Value<double?> distanceKm = const Value.absent(),
+    Value<int?> durationSec = const Value.absent(),
     bool? isPr,
   }) => SetLog(
     id: id ?? this.id,
@@ -1342,6 +1688,8 @@ class SetLog extends DataClass implements Insertable<SetLog> {
     weightKg: weightKg ?? this.weightKg,
     reps: reps ?? this.reps,
     rpe: rpe.present ? rpe.value : this.rpe,
+    distanceKm: distanceKm.present ? distanceKm.value : this.distanceKm,
+    durationSec: durationSec.present ? durationSec.value : this.durationSec,
     isPr: isPr ?? this.isPr,
   );
   SetLog copyWithCompanion(SetLogsCompanion data) {
@@ -1355,6 +1703,12 @@ class SetLog extends DataClass implements Insertable<SetLog> {
       weightKg: data.weightKg.present ? data.weightKg.value : this.weightKg,
       reps: data.reps.present ? data.reps.value : this.reps,
       rpe: data.rpe.present ? data.rpe.value : this.rpe,
+      distanceKm: data.distanceKm.present
+          ? data.distanceKm.value
+          : this.distanceKm,
+      durationSec: data.durationSec.present
+          ? data.durationSec.value
+          : this.durationSec,
       isPr: data.isPr.present ? data.isPr.value : this.isPr,
     );
   }
@@ -1369,6 +1723,8 @@ class SetLog extends DataClass implements Insertable<SetLog> {
           ..write('weightKg: $weightKg, ')
           ..write('reps: $reps, ')
           ..write('rpe: $rpe, ')
+          ..write('distanceKm: $distanceKm, ')
+          ..write('durationSec: $durationSec, ')
           ..write('isPr: $isPr')
           ..write(')'))
         .toString();
@@ -1383,6 +1739,8 @@ class SetLog extends DataClass implements Insertable<SetLog> {
     weightKg,
     reps,
     rpe,
+    distanceKm,
+    durationSec,
     isPr,
   );
   @override
@@ -1396,6 +1754,8 @@ class SetLog extends DataClass implements Insertable<SetLog> {
           other.weightKg == this.weightKg &&
           other.reps == this.reps &&
           other.rpe == this.rpe &&
+          other.distanceKm == this.distanceKm &&
+          other.durationSec == this.durationSec &&
           other.isPr == this.isPr);
 }
 
@@ -1407,6 +1767,8 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
   final Value<double> weightKg;
   final Value<int> reps;
   final Value<double?> rpe;
+  final Value<double?> distanceKm;
+  final Value<int?> durationSec;
   final Value<bool> isPr;
   const SetLogsCompanion({
     this.id = const Value.absent(),
@@ -1416,6 +1778,8 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
     this.weightKg = const Value.absent(),
     this.reps = const Value.absent(),
     this.rpe = const Value.absent(),
+    this.distanceKm = const Value.absent(),
+    this.durationSec = const Value.absent(),
     this.isPr = const Value.absent(),
   });
   SetLogsCompanion.insert({
@@ -1426,6 +1790,8 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
     required double weightKg,
     required int reps,
     this.rpe = const Value.absent(),
+    this.distanceKm = const Value.absent(),
+    this.durationSec = const Value.absent(),
     this.isPr = const Value.absent(),
   }) : sessionId = Value(sessionId),
        exerciseName = Value(exerciseName),
@@ -1440,6 +1806,8 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
     Expression<double>? weightKg,
     Expression<int>? reps,
     Expression<double>? rpe,
+    Expression<double>? distanceKm,
+    Expression<int>? durationSec,
     Expression<bool>? isPr,
   }) {
     return RawValuesInsertable({
@@ -1450,6 +1818,8 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
       if (weightKg != null) 'weight_kg': weightKg,
       if (reps != null) 'reps': reps,
       if (rpe != null) 'rpe': rpe,
+      if (distanceKm != null) 'distance_km': distanceKm,
+      if (durationSec != null) 'duration_sec': durationSec,
       if (isPr != null) 'is_pr': isPr,
     });
   }
@@ -1462,6 +1832,8 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
     Value<double>? weightKg,
     Value<int>? reps,
     Value<double?>? rpe,
+    Value<double?>? distanceKm,
+    Value<int?>? durationSec,
     Value<bool>? isPr,
   }) {
     return SetLogsCompanion(
@@ -1472,6 +1844,8 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
       weightKg: weightKg ?? this.weightKg,
       reps: reps ?? this.reps,
       rpe: rpe ?? this.rpe,
+      distanceKm: distanceKm ?? this.distanceKm,
+      durationSec: durationSec ?? this.durationSec,
       isPr: isPr ?? this.isPr,
     );
   }
@@ -1500,6 +1874,12 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
     if (rpe.present) {
       map['rpe'] = Variable<double>(rpe.value);
     }
+    if (distanceKm.present) {
+      map['distance_km'] = Variable<double>(distanceKm.value);
+    }
+    if (durationSec.present) {
+      map['duration_sec'] = Variable<int>(durationSec.value);
+    }
     if (isPr.present) {
       map['is_pr'] = Variable<bool>(isPr.value);
     }
@@ -1516,6 +1896,8 @@ class SetLogsCompanion extends UpdateCompanion<SetLog> {
           ..write('weightKg: $weightKg, ')
           ..write('reps: $reps, ')
           ..write('rpe: $rpe, ')
+          ..write('distanceKm: $distanceKm, ')
+          ..write('durationSec: $durationSec, ')
           ..write('isPr: $isPr')
           ..write(')'))
         .toString();
@@ -1552,6 +1934,18 @@ class $PersonalRecordsTable extends PersonalRecords
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _categoryMeta = const VerificationMeta(
+    'category',
+  );
+  @override
+  late final GeneratedColumn<String> category = GeneratedColumn<String>(
+    'category',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('Other'),
+  );
   static const VerificationMeta _weightKgMeta = const VerificationMeta(
     'weightKg',
   );
@@ -1571,6 +1965,37 @@ class $PersonalRecordsTable extends PersonalRecords
     false,
     type: DriftSqlType.int,
     requiredDuringInsert: true,
+  );
+  static const VerificationMeta _metricMeta = const VerificationMeta('metric');
+  @override
+  late final GeneratedColumn<String> metric = GeneratedColumn<String>(
+    'metric',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _distanceKmMeta = const VerificationMeta(
+    'distanceKm',
+  );
+  @override
+  late final GeneratedColumn<double> distanceKm = GeneratedColumn<double>(
+    'distance_km',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _durationSecMeta = const VerificationMeta(
+    'durationSec',
+  );
+  @override
+  late final GeneratedColumn<int> durationSec = GeneratedColumn<int>(
+    'duration_sec',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
   );
   static const VerificationMeta _achievedAtMeta = const VerificationMeta(
     'achievedAt',
@@ -1598,8 +2023,12 @@ class $PersonalRecordsTable extends PersonalRecords
   List<GeneratedColumn> get $columns => [
     id,
     exerciseName,
+    category,
     weightKg,
     reps,
+    metric,
+    distanceKm,
+    durationSec,
     achievedAt,
     photoPath,
   ];
@@ -1629,6 +2058,12 @@ class $PersonalRecordsTable extends PersonalRecords
     } else if (isInserting) {
       context.missing(_exerciseNameMeta);
     }
+    if (data.containsKey('category')) {
+      context.handle(
+        _categoryMeta,
+        category.isAcceptableOrUnknown(data['category']!, _categoryMeta),
+      );
+    }
     if (data.containsKey('weight_kg')) {
       context.handle(
         _weightKgMeta,
@@ -1644,6 +2079,27 @@ class $PersonalRecordsTable extends PersonalRecords
       );
     } else if (isInserting) {
       context.missing(_repsMeta);
+    }
+    if (data.containsKey('metric')) {
+      context.handle(
+        _metricMeta,
+        metric.isAcceptableOrUnknown(data['metric']!, _metricMeta),
+      );
+    }
+    if (data.containsKey('distance_km')) {
+      context.handle(
+        _distanceKmMeta,
+        distanceKm.isAcceptableOrUnknown(data['distance_km']!, _distanceKmMeta),
+      );
+    }
+    if (data.containsKey('duration_sec')) {
+      context.handle(
+        _durationSecMeta,
+        durationSec.isAcceptableOrUnknown(
+          data['duration_sec']!,
+          _durationSecMeta,
+        ),
+      );
     }
     if (data.containsKey('achieved_at')) {
       context.handle(
@@ -1676,6 +2132,10 @@ class $PersonalRecordsTable extends PersonalRecords
         DriftSqlType.string,
         data['${effectivePrefix}exercise_name'],
       )!,
+      category: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}category'],
+      )!,
       weightKg: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}weight_kg'],
@@ -1684,6 +2144,18 @@ class $PersonalRecordsTable extends PersonalRecords
         DriftSqlType.int,
         data['${effectivePrefix}reps'],
       )!,
+      metric: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}metric'],
+      ),
+      distanceKm: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}distance_km'],
+      ),
+      durationSec: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}duration_sec'],
+      ),
       achievedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}achieved_at'],
@@ -1704,15 +2176,25 @@ class $PersonalRecordsTable extends PersonalRecords
 class PersonalRecord extends DataClass implements Insertable<PersonalRecord> {
   final int id;
   final String exerciseName;
+  final String category;
   final double weightKg;
   final int reps;
+
+  /// Cardio PR shape (null metric = classic weight × reps record).
+  final String? metric;
+  final double? distanceKm;
+  final int? durationSec;
   final DateTime achievedAt;
   final String? photoPath;
   const PersonalRecord({
     required this.id,
     required this.exerciseName,
+    required this.category,
     required this.weightKg,
     required this.reps,
+    this.metric,
+    this.distanceKm,
+    this.durationSec,
     required this.achievedAt,
     this.photoPath,
   });
@@ -1721,8 +2203,18 @@ class PersonalRecord extends DataClass implements Insertable<PersonalRecord> {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
     map['exercise_name'] = Variable<String>(exerciseName);
+    map['category'] = Variable<String>(category);
     map['weight_kg'] = Variable<double>(weightKg);
     map['reps'] = Variable<int>(reps);
+    if (!nullToAbsent || metric != null) {
+      map['metric'] = Variable<String>(metric);
+    }
+    if (!nullToAbsent || distanceKm != null) {
+      map['distance_km'] = Variable<double>(distanceKm);
+    }
+    if (!nullToAbsent || durationSec != null) {
+      map['duration_sec'] = Variable<int>(durationSec);
+    }
     map['achieved_at'] = Variable<DateTime>(achievedAt);
     if (!nullToAbsent || photoPath != null) {
       map['photo_path'] = Variable<String>(photoPath);
@@ -1734,8 +2226,18 @@ class PersonalRecord extends DataClass implements Insertable<PersonalRecord> {
     return PersonalRecordsCompanion(
       id: Value(id),
       exerciseName: Value(exerciseName),
+      category: Value(category),
       weightKg: Value(weightKg),
       reps: Value(reps),
+      metric: metric == null && nullToAbsent
+          ? const Value.absent()
+          : Value(metric),
+      distanceKm: distanceKm == null && nullToAbsent
+          ? const Value.absent()
+          : Value(distanceKm),
+      durationSec: durationSec == null && nullToAbsent
+          ? const Value.absent()
+          : Value(durationSec),
       achievedAt: Value(achievedAt),
       photoPath: photoPath == null && nullToAbsent
           ? const Value.absent()
@@ -1751,8 +2253,12 @@ class PersonalRecord extends DataClass implements Insertable<PersonalRecord> {
     return PersonalRecord(
       id: serializer.fromJson<int>(json['id']),
       exerciseName: serializer.fromJson<String>(json['exerciseName']),
+      category: serializer.fromJson<String>(json['category']),
       weightKg: serializer.fromJson<double>(json['weightKg']),
       reps: serializer.fromJson<int>(json['reps']),
+      metric: serializer.fromJson<String?>(json['metric']),
+      distanceKm: serializer.fromJson<double?>(json['distanceKm']),
+      durationSec: serializer.fromJson<int?>(json['durationSec']),
       achievedAt: serializer.fromJson<DateTime>(json['achievedAt']),
       photoPath: serializer.fromJson<String?>(json['photoPath']),
     );
@@ -1763,8 +2269,12 @@ class PersonalRecord extends DataClass implements Insertable<PersonalRecord> {
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
       'exerciseName': serializer.toJson<String>(exerciseName),
+      'category': serializer.toJson<String>(category),
       'weightKg': serializer.toJson<double>(weightKg),
       'reps': serializer.toJson<int>(reps),
+      'metric': serializer.toJson<String?>(metric),
+      'distanceKm': serializer.toJson<double?>(distanceKm),
+      'durationSec': serializer.toJson<int?>(durationSec),
       'achievedAt': serializer.toJson<DateTime>(achievedAt),
       'photoPath': serializer.toJson<String?>(photoPath),
     };
@@ -1773,15 +2283,23 @@ class PersonalRecord extends DataClass implements Insertable<PersonalRecord> {
   PersonalRecord copyWith({
     int? id,
     String? exerciseName,
+    String? category,
     double? weightKg,
     int? reps,
+    Value<String?> metric = const Value.absent(),
+    Value<double?> distanceKm = const Value.absent(),
+    Value<int?> durationSec = const Value.absent(),
     DateTime? achievedAt,
     Value<String?> photoPath = const Value.absent(),
   }) => PersonalRecord(
     id: id ?? this.id,
     exerciseName: exerciseName ?? this.exerciseName,
+    category: category ?? this.category,
     weightKg: weightKg ?? this.weightKg,
     reps: reps ?? this.reps,
+    metric: metric.present ? metric.value : this.metric,
+    distanceKm: distanceKm.present ? distanceKm.value : this.distanceKm,
+    durationSec: durationSec.present ? durationSec.value : this.durationSec,
     achievedAt: achievedAt ?? this.achievedAt,
     photoPath: photoPath.present ? photoPath.value : this.photoPath,
   );
@@ -1791,8 +2309,16 @@ class PersonalRecord extends DataClass implements Insertable<PersonalRecord> {
       exerciseName: data.exerciseName.present
           ? data.exerciseName.value
           : this.exerciseName,
+      category: data.category.present ? data.category.value : this.category,
       weightKg: data.weightKg.present ? data.weightKg.value : this.weightKg,
       reps: data.reps.present ? data.reps.value : this.reps,
+      metric: data.metric.present ? data.metric.value : this.metric,
+      distanceKm: data.distanceKm.present
+          ? data.distanceKm.value
+          : this.distanceKm,
+      durationSec: data.durationSec.present
+          ? data.durationSec.value
+          : this.durationSec,
       achievedAt: data.achievedAt.present
           ? data.achievedAt.value
           : this.achievedAt,
@@ -1805,8 +2331,12 @@ class PersonalRecord extends DataClass implements Insertable<PersonalRecord> {
     return (StringBuffer('PersonalRecord(')
           ..write('id: $id, ')
           ..write('exerciseName: $exerciseName, ')
+          ..write('category: $category, ')
           ..write('weightKg: $weightKg, ')
           ..write('reps: $reps, ')
+          ..write('metric: $metric, ')
+          ..write('distanceKm: $distanceKm, ')
+          ..write('durationSec: $durationSec, ')
           ..write('achievedAt: $achievedAt, ')
           ..write('photoPath: $photoPath')
           ..write(')'))
@@ -1814,16 +2344,30 @@ class PersonalRecord extends DataClass implements Insertable<PersonalRecord> {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, exerciseName, weightKg, reps, achievedAt, photoPath);
+  int get hashCode => Object.hash(
+    id,
+    exerciseName,
+    category,
+    weightKg,
+    reps,
+    metric,
+    distanceKm,
+    durationSec,
+    achievedAt,
+    photoPath,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is PersonalRecord &&
           other.id == this.id &&
           other.exerciseName == this.exerciseName &&
+          other.category == this.category &&
           other.weightKg == this.weightKg &&
           other.reps == this.reps &&
+          other.metric == this.metric &&
+          other.distanceKm == this.distanceKm &&
+          other.durationSec == this.durationSec &&
           other.achievedAt == this.achievedAt &&
           other.photoPath == this.photoPath);
 }
@@ -1831,23 +2375,35 @@ class PersonalRecord extends DataClass implements Insertable<PersonalRecord> {
 class PersonalRecordsCompanion extends UpdateCompanion<PersonalRecord> {
   final Value<int> id;
   final Value<String> exerciseName;
+  final Value<String> category;
   final Value<double> weightKg;
   final Value<int> reps;
+  final Value<String?> metric;
+  final Value<double?> distanceKm;
+  final Value<int?> durationSec;
   final Value<DateTime> achievedAt;
   final Value<String?> photoPath;
   const PersonalRecordsCompanion({
     this.id = const Value.absent(),
     this.exerciseName = const Value.absent(),
+    this.category = const Value.absent(),
     this.weightKg = const Value.absent(),
     this.reps = const Value.absent(),
+    this.metric = const Value.absent(),
+    this.distanceKm = const Value.absent(),
+    this.durationSec = const Value.absent(),
     this.achievedAt = const Value.absent(),
     this.photoPath = const Value.absent(),
   });
   PersonalRecordsCompanion.insert({
     this.id = const Value.absent(),
     required String exerciseName,
+    this.category = const Value.absent(),
     required double weightKg,
     required int reps,
+    this.metric = const Value.absent(),
+    this.distanceKm = const Value.absent(),
+    this.durationSec = const Value.absent(),
     required DateTime achievedAt,
     this.photoPath = const Value.absent(),
   }) : exerciseName = Value(exerciseName),
@@ -1857,16 +2413,24 @@ class PersonalRecordsCompanion extends UpdateCompanion<PersonalRecord> {
   static Insertable<PersonalRecord> custom({
     Expression<int>? id,
     Expression<String>? exerciseName,
+    Expression<String>? category,
     Expression<double>? weightKg,
     Expression<int>? reps,
+    Expression<String>? metric,
+    Expression<double>? distanceKm,
+    Expression<int>? durationSec,
     Expression<DateTime>? achievedAt,
     Expression<String>? photoPath,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (exerciseName != null) 'exercise_name': exerciseName,
+      if (category != null) 'category': category,
       if (weightKg != null) 'weight_kg': weightKg,
       if (reps != null) 'reps': reps,
+      if (metric != null) 'metric': metric,
+      if (distanceKm != null) 'distance_km': distanceKm,
+      if (durationSec != null) 'duration_sec': durationSec,
       if (achievedAt != null) 'achieved_at': achievedAt,
       if (photoPath != null) 'photo_path': photoPath,
     });
@@ -1875,16 +2439,24 @@ class PersonalRecordsCompanion extends UpdateCompanion<PersonalRecord> {
   PersonalRecordsCompanion copyWith({
     Value<int>? id,
     Value<String>? exerciseName,
+    Value<String>? category,
     Value<double>? weightKg,
     Value<int>? reps,
+    Value<String?>? metric,
+    Value<double?>? distanceKm,
+    Value<int?>? durationSec,
     Value<DateTime>? achievedAt,
     Value<String?>? photoPath,
   }) {
     return PersonalRecordsCompanion(
       id: id ?? this.id,
       exerciseName: exerciseName ?? this.exerciseName,
+      category: category ?? this.category,
       weightKg: weightKg ?? this.weightKg,
       reps: reps ?? this.reps,
+      metric: metric ?? this.metric,
+      distanceKm: distanceKm ?? this.distanceKm,
+      durationSec: durationSec ?? this.durationSec,
       achievedAt: achievedAt ?? this.achievedAt,
       photoPath: photoPath ?? this.photoPath,
     );
@@ -1899,11 +2471,23 @@ class PersonalRecordsCompanion extends UpdateCompanion<PersonalRecord> {
     if (exerciseName.present) {
       map['exercise_name'] = Variable<String>(exerciseName.value);
     }
+    if (category.present) {
+      map['category'] = Variable<String>(category.value);
+    }
     if (weightKg.present) {
       map['weight_kg'] = Variable<double>(weightKg.value);
     }
     if (reps.present) {
       map['reps'] = Variable<int>(reps.value);
+    }
+    if (metric.present) {
+      map['metric'] = Variable<String>(metric.value);
+    }
+    if (distanceKm.present) {
+      map['distance_km'] = Variable<double>(distanceKm.value);
+    }
+    if (durationSec.present) {
+      map['duration_sec'] = Variable<int>(durationSec.value);
     }
     if (achievedAt.present) {
       map['achieved_at'] = Variable<DateTime>(achievedAt.value);
@@ -1919,8 +2503,12 @@ class PersonalRecordsCompanion extends UpdateCompanion<PersonalRecord> {
     return (StringBuffer('PersonalRecordsCompanion(')
           ..write('id: $id, ')
           ..write('exerciseName: $exerciseName, ')
+          ..write('category: $category, ')
           ..write('weightKg: $weightKg, ')
           ..write('reps: $reps, ')
+          ..write('metric: $metric, ')
+          ..write('distanceKm: $distanceKm, ')
+          ..write('durationSec: $durationSec, ')
           ..write('achievedAt: $achievedAt, ')
           ..write('photoPath: $photoPath')
           ..write(')'))
@@ -1946,6 +2534,15 @@ class $RoutineItemsTable extends RoutineItems
     defaultConstraints: GeneratedColumn.constraintIsAlways(
       'PRIMARY KEY AUTOINCREMENT',
     ),
+  );
+  static const VerificationMeta _listIdMeta = const VerificationMeta('listId');
+  @override
+  late final GeneratedColumn<int> listId = GeneratedColumn<int>(
+    'list_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
   );
   static const VerificationMeta _labelMeta = const VerificationMeta('label');
   @override
@@ -1978,6 +2575,39 @@ class $RoutineItemsTable extends RoutineItems
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _daysMaskMeta = const VerificationMeta(
+    'daysMask',
+  );
+  @override
+  late final GeneratedColumn<int> daysMask = GeneratedColumn<int>(
+    'days_mask',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(127),
+  );
+  static const VerificationMeta _hydrationGoalMlMeta = const VerificationMeta(
+    'hydrationGoalMl',
+  );
+  @override
+  late final GeneratedColumn<int> hydrationGoalMl = GeneratedColumn<int>(
+    'hydration_goal_ml',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _hydrationIntervalMinMeta =
+      const VerificationMeta('hydrationIntervalMin');
+  @override
+  late final GeneratedColumn<int> hydrationIntervalMin = GeneratedColumn<int>(
+    'hydration_interval_min',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _orderIndexMeta = const VerificationMeta(
     'orderIndex',
   );
@@ -2008,9 +2638,13 @@ class $RoutineItemsTable extends RoutineItems
   @override
   List<GeneratedColumn> get $columns => [
     id,
+    listId,
     label,
     category,
     defaultTime,
+    daysMask,
+    hydrationGoalMl,
+    hydrationIntervalMin,
     orderIndex,
     isActive,
   ];
@@ -2028,6 +2662,12 @@ class $RoutineItemsTable extends RoutineItems
     final data = instance.toColumns(true);
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('list_id')) {
+      context.handle(
+        _listIdMeta,
+        listId.isAcceptableOrUnknown(data['list_id']!, _listIdMeta),
+      );
     }
     if (data.containsKey('label')) {
       context.handle(
@@ -2051,6 +2691,30 @@ class $RoutineItemsTable extends RoutineItems
         defaultTime.isAcceptableOrUnknown(
           data['default_time']!,
           _defaultTimeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('days_mask')) {
+      context.handle(
+        _daysMaskMeta,
+        daysMask.isAcceptableOrUnknown(data['days_mask']!, _daysMaskMeta),
+      );
+    }
+    if (data.containsKey('hydration_goal_ml')) {
+      context.handle(
+        _hydrationGoalMlMeta,
+        hydrationGoalMl.isAcceptableOrUnknown(
+          data['hydration_goal_ml']!,
+          _hydrationGoalMlMeta,
+        ),
+      );
+    }
+    if (data.containsKey('hydration_interval_min')) {
+      context.handle(
+        _hydrationIntervalMinMeta,
+        hydrationIntervalMin.isAcceptableOrUnknown(
+          data['hydration_interval_min']!,
+          _hydrationIntervalMinMeta,
         ),
       );
     }
@@ -2079,6 +2743,10 @@ class $RoutineItemsTable extends RoutineItems
         DriftSqlType.int,
         data['${effectivePrefix}id'],
       )!,
+      listId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}list_id'],
+      ),
       label: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}label'],
@@ -2090,6 +2758,18 @@ class $RoutineItemsTable extends RoutineItems
       defaultTime: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}default_time'],
+      ),
+      daysMask: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}days_mask'],
+      )!,
+      hydrationGoalMl: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}hydration_goal_ml'],
+      ),
+      hydrationIntervalMin: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}hydration_interval_min'],
       ),
       orderIndex: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
@@ -2110,16 +2790,24 @@ class $RoutineItemsTable extends RoutineItems
 
 class RoutineItem extends DataClass implements Insertable<RoutineItem> {
   final int id;
+  final int? listId;
   final String label;
   final String category;
   final String? defaultTime;
+  final int daysMask;
+  final int? hydrationGoalMl;
+  final int? hydrationIntervalMin;
   final int orderIndex;
   final bool isActive;
   const RoutineItem({
     required this.id,
+    this.listId,
     required this.label,
     required this.category,
     this.defaultTime,
+    required this.daysMask,
+    this.hydrationGoalMl,
+    this.hydrationIntervalMin,
     required this.orderIndex,
     required this.isActive,
   });
@@ -2127,10 +2815,20 @@ class RoutineItem extends DataClass implements Insertable<RoutineItem> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
+    if (!nullToAbsent || listId != null) {
+      map['list_id'] = Variable<int>(listId);
+    }
     map['label'] = Variable<String>(label);
     map['category'] = Variable<String>(category);
     if (!nullToAbsent || defaultTime != null) {
       map['default_time'] = Variable<String>(defaultTime);
+    }
+    map['days_mask'] = Variable<int>(daysMask);
+    if (!nullToAbsent || hydrationGoalMl != null) {
+      map['hydration_goal_ml'] = Variable<int>(hydrationGoalMl);
+    }
+    if (!nullToAbsent || hydrationIntervalMin != null) {
+      map['hydration_interval_min'] = Variable<int>(hydrationIntervalMin);
     }
     map['order_index'] = Variable<int>(orderIndex);
     map['is_active'] = Variable<bool>(isActive);
@@ -2140,11 +2838,21 @@ class RoutineItem extends DataClass implements Insertable<RoutineItem> {
   RoutineItemsCompanion toCompanion(bool nullToAbsent) {
     return RoutineItemsCompanion(
       id: Value(id),
+      listId: listId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(listId),
       label: Value(label),
       category: Value(category),
       defaultTime: defaultTime == null && nullToAbsent
           ? const Value.absent()
           : Value(defaultTime),
+      daysMask: Value(daysMask),
+      hydrationGoalMl: hydrationGoalMl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(hydrationGoalMl),
+      hydrationIntervalMin: hydrationIntervalMin == null && nullToAbsent
+          ? const Value.absent()
+          : Value(hydrationIntervalMin),
       orderIndex: Value(orderIndex),
       isActive: Value(isActive),
     );
@@ -2157,9 +2865,15 @@ class RoutineItem extends DataClass implements Insertable<RoutineItem> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return RoutineItem(
       id: serializer.fromJson<int>(json['id']),
+      listId: serializer.fromJson<int?>(json['listId']),
       label: serializer.fromJson<String>(json['label']),
       category: serializer.fromJson<String>(json['category']),
       defaultTime: serializer.fromJson<String?>(json['defaultTime']),
+      daysMask: serializer.fromJson<int>(json['daysMask']),
+      hydrationGoalMl: serializer.fromJson<int?>(json['hydrationGoalMl']),
+      hydrationIntervalMin: serializer.fromJson<int?>(
+        json['hydrationIntervalMin'],
+      ),
       orderIndex: serializer.fromJson<int>(json['orderIndex']),
       isActive: serializer.fromJson<bool>(json['isActive']),
     );
@@ -2169,9 +2883,13 @@ class RoutineItem extends DataClass implements Insertable<RoutineItem> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
+      'listId': serializer.toJson<int?>(listId),
       'label': serializer.toJson<String>(label),
       'category': serializer.toJson<String>(category),
       'defaultTime': serializer.toJson<String?>(defaultTime),
+      'daysMask': serializer.toJson<int>(daysMask),
+      'hydrationGoalMl': serializer.toJson<int?>(hydrationGoalMl),
+      'hydrationIntervalMin': serializer.toJson<int?>(hydrationIntervalMin),
       'orderIndex': serializer.toJson<int>(orderIndex),
       'isActive': serializer.toJson<bool>(isActive),
     };
@@ -2179,27 +2897,47 @@ class RoutineItem extends DataClass implements Insertable<RoutineItem> {
 
   RoutineItem copyWith({
     int? id,
+    Value<int?> listId = const Value.absent(),
     String? label,
     String? category,
     Value<String?> defaultTime = const Value.absent(),
+    int? daysMask,
+    Value<int?> hydrationGoalMl = const Value.absent(),
+    Value<int?> hydrationIntervalMin = const Value.absent(),
     int? orderIndex,
     bool? isActive,
   }) => RoutineItem(
     id: id ?? this.id,
+    listId: listId.present ? listId.value : this.listId,
     label: label ?? this.label,
     category: category ?? this.category,
     defaultTime: defaultTime.present ? defaultTime.value : this.defaultTime,
+    daysMask: daysMask ?? this.daysMask,
+    hydrationGoalMl: hydrationGoalMl.present
+        ? hydrationGoalMl.value
+        : this.hydrationGoalMl,
+    hydrationIntervalMin: hydrationIntervalMin.present
+        ? hydrationIntervalMin.value
+        : this.hydrationIntervalMin,
     orderIndex: orderIndex ?? this.orderIndex,
     isActive: isActive ?? this.isActive,
   );
   RoutineItem copyWithCompanion(RoutineItemsCompanion data) {
     return RoutineItem(
       id: data.id.present ? data.id.value : this.id,
+      listId: data.listId.present ? data.listId.value : this.listId,
       label: data.label.present ? data.label.value : this.label,
       category: data.category.present ? data.category.value : this.category,
       defaultTime: data.defaultTime.present
           ? data.defaultTime.value
           : this.defaultTime,
+      daysMask: data.daysMask.present ? data.daysMask.value : this.daysMask,
+      hydrationGoalMl: data.hydrationGoalMl.present
+          ? data.hydrationGoalMl.value
+          : this.hydrationGoalMl,
+      hydrationIntervalMin: data.hydrationIntervalMin.present
+          ? data.hydrationIntervalMin.value
+          : this.hydrationIntervalMin,
       orderIndex: data.orderIndex.present
           ? data.orderIndex.value
           : this.orderIndex,
@@ -2211,9 +2949,13 @@ class RoutineItem extends DataClass implements Insertable<RoutineItem> {
   String toString() {
     return (StringBuffer('RoutineItem(')
           ..write('id: $id, ')
+          ..write('listId: $listId, ')
           ..write('label: $label, ')
           ..write('category: $category, ')
           ..write('defaultTime: $defaultTime, ')
+          ..write('daysMask: $daysMask, ')
+          ..write('hydrationGoalMl: $hydrationGoalMl, ')
+          ..write('hydrationIntervalMin: $hydrationIntervalMin, ')
           ..write('orderIndex: $orderIndex, ')
           ..write('isActive: $isActive')
           ..write(')'))
@@ -2221,57 +2963,92 @@ class RoutineItem extends DataClass implements Insertable<RoutineItem> {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, label, category, defaultTime, orderIndex, isActive);
+  int get hashCode => Object.hash(
+    id,
+    listId,
+    label,
+    category,
+    defaultTime,
+    daysMask,
+    hydrationGoalMl,
+    hydrationIntervalMin,
+    orderIndex,
+    isActive,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is RoutineItem &&
           other.id == this.id &&
+          other.listId == this.listId &&
           other.label == this.label &&
           other.category == this.category &&
           other.defaultTime == this.defaultTime &&
+          other.daysMask == this.daysMask &&
+          other.hydrationGoalMl == this.hydrationGoalMl &&
+          other.hydrationIntervalMin == this.hydrationIntervalMin &&
           other.orderIndex == this.orderIndex &&
           other.isActive == this.isActive);
 }
 
 class RoutineItemsCompanion extends UpdateCompanion<RoutineItem> {
   final Value<int> id;
+  final Value<int?> listId;
   final Value<String> label;
   final Value<String> category;
   final Value<String?> defaultTime;
+  final Value<int> daysMask;
+  final Value<int?> hydrationGoalMl;
+  final Value<int?> hydrationIntervalMin;
   final Value<int> orderIndex;
   final Value<bool> isActive;
   const RoutineItemsCompanion({
     this.id = const Value.absent(),
+    this.listId = const Value.absent(),
     this.label = const Value.absent(),
     this.category = const Value.absent(),
     this.defaultTime = const Value.absent(),
+    this.daysMask = const Value.absent(),
+    this.hydrationGoalMl = const Value.absent(),
+    this.hydrationIntervalMin = const Value.absent(),
     this.orderIndex = const Value.absent(),
     this.isActive = const Value.absent(),
   });
   RoutineItemsCompanion.insert({
     this.id = const Value.absent(),
+    this.listId = const Value.absent(),
     required String label,
     required String category,
     this.defaultTime = const Value.absent(),
+    this.daysMask = const Value.absent(),
+    this.hydrationGoalMl = const Value.absent(),
+    this.hydrationIntervalMin = const Value.absent(),
     this.orderIndex = const Value.absent(),
     this.isActive = const Value.absent(),
   }) : label = Value(label),
        category = Value(category);
   static Insertable<RoutineItem> custom({
     Expression<int>? id,
+    Expression<int>? listId,
     Expression<String>? label,
     Expression<String>? category,
     Expression<String>? defaultTime,
+    Expression<int>? daysMask,
+    Expression<int>? hydrationGoalMl,
+    Expression<int>? hydrationIntervalMin,
     Expression<int>? orderIndex,
     Expression<bool>? isActive,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
+      if (listId != null) 'list_id': listId,
       if (label != null) 'label': label,
       if (category != null) 'category': category,
       if (defaultTime != null) 'default_time': defaultTime,
+      if (daysMask != null) 'days_mask': daysMask,
+      if (hydrationGoalMl != null) 'hydration_goal_ml': hydrationGoalMl,
+      if (hydrationIntervalMin != null)
+        'hydration_interval_min': hydrationIntervalMin,
       if (orderIndex != null) 'order_index': orderIndex,
       if (isActive != null) 'is_active': isActive,
     });
@@ -2279,17 +3056,25 @@ class RoutineItemsCompanion extends UpdateCompanion<RoutineItem> {
 
   RoutineItemsCompanion copyWith({
     Value<int>? id,
+    Value<int?>? listId,
     Value<String>? label,
     Value<String>? category,
     Value<String?>? defaultTime,
+    Value<int>? daysMask,
+    Value<int?>? hydrationGoalMl,
+    Value<int?>? hydrationIntervalMin,
     Value<int>? orderIndex,
     Value<bool>? isActive,
   }) {
     return RoutineItemsCompanion(
       id: id ?? this.id,
+      listId: listId ?? this.listId,
       label: label ?? this.label,
       category: category ?? this.category,
       defaultTime: defaultTime ?? this.defaultTime,
+      daysMask: daysMask ?? this.daysMask,
+      hydrationGoalMl: hydrationGoalMl ?? this.hydrationGoalMl,
+      hydrationIntervalMin: hydrationIntervalMin ?? this.hydrationIntervalMin,
       orderIndex: orderIndex ?? this.orderIndex,
       isActive: isActive ?? this.isActive,
     );
@@ -2301,6 +3086,9 @@ class RoutineItemsCompanion extends UpdateCompanion<RoutineItem> {
     if (id.present) {
       map['id'] = Variable<int>(id.value);
     }
+    if (listId.present) {
+      map['list_id'] = Variable<int>(listId.value);
+    }
     if (label.present) {
       map['label'] = Variable<String>(label.value);
     }
@@ -2309,6 +3097,15 @@ class RoutineItemsCompanion extends UpdateCompanion<RoutineItem> {
     }
     if (defaultTime.present) {
       map['default_time'] = Variable<String>(defaultTime.value);
+    }
+    if (daysMask.present) {
+      map['days_mask'] = Variable<int>(daysMask.value);
+    }
+    if (hydrationGoalMl.present) {
+      map['hydration_goal_ml'] = Variable<int>(hydrationGoalMl.value);
+    }
+    if (hydrationIntervalMin.present) {
+      map['hydration_interval_min'] = Variable<int>(hydrationIntervalMin.value);
     }
     if (orderIndex.present) {
       map['order_index'] = Variable<int>(orderIndex.value);
@@ -2323,9 +3120,13 @@ class RoutineItemsCompanion extends UpdateCompanion<RoutineItem> {
   String toString() {
     return (StringBuffer('RoutineItemsCompanion(')
           ..write('id: $id, ')
+          ..write('listId: $listId, ')
           ..write('label: $label, ')
           ..write('category: $category, ')
           ..write('defaultTime: $defaultTime, ')
+          ..write('daysMask: $daysMask, ')
+          ..write('hydrationGoalMl: $hydrationGoalMl, ')
+          ..write('hydrationIntervalMin: $hydrationIntervalMin, ')
           ..write('orderIndex: $orderIndex, ')
           ..write('isActive: $isActive')
           ..write(')'))
@@ -2728,6 +3529,17 @@ class $MealPrepTasksTable extends MealPrepTasks
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _reminderTimeMeta = const VerificationMeta(
+    'reminderTime',
+  );
+  @override
+  late final GeneratedColumn<String> reminderTime = GeneratedColumn<String>(
+    'reminder_time',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _isActiveMeta = const VerificationMeta(
     'isActive',
   );
@@ -2744,7 +3556,13 @@ class $MealPrepTasksTable extends MealPrepTasks
     defaultValue: const Constant(true),
   );
   @override
-  List<GeneratedColumn> get $columns => [id, label, weekday, isActive];
+  List<GeneratedColumn> get $columns => [
+    id,
+    label,
+    weekday,
+    reminderTime,
+    isActive,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -2776,6 +3594,15 @@ class $MealPrepTasksTable extends MealPrepTasks
     } else if (isInserting) {
       context.missing(_weekdayMeta);
     }
+    if (data.containsKey('reminder_time')) {
+      context.handle(
+        _reminderTimeMeta,
+        reminderTime.isAcceptableOrUnknown(
+          data['reminder_time']!,
+          _reminderTimeMeta,
+        ),
+      );
+    }
     if (data.containsKey('is_active')) {
       context.handle(
         _isActiveMeta,
@@ -2803,6 +3630,10 @@ class $MealPrepTasksTable extends MealPrepTasks
         DriftSqlType.int,
         data['${effectivePrefix}weekday'],
       )!,
+      reminderTime: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reminder_time'],
+      ),
       isActive: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_active'],
@@ -2820,11 +3651,13 @@ class MealPrepTask extends DataClass implements Insertable<MealPrepTask> {
   final int id;
   final String label;
   final int weekday;
+  final String? reminderTime;
   final bool isActive;
   const MealPrepTask({
     required this.id,
     required this.label,
     required this.weekday,
+    this.reminderTime,
     required this.isActive,
   });
   @override
@@ -2833,6 +3666,9 @@ class MealPrepTask extends DataClass implements Insertable<MealPrepTask> {
     map['id'] = Variable<int>(id);
     map['label'] = Variable<String>(label);
     map['weekday'] = Variable<int>(weekday);
+    if (!nullToAbsent || reminderTime != null) {
+      map['reminder_time'] = Variable<String>(reminderTime);
+    }
     map['is_active'] = Variable<bool>(isActive);
     return map;
   }
@@ -2842,6 +3678,9 @@ class MealPrepTask extends DataClass implements Insertable<MealPrepTask> {
       id: Value(id),
       label: Value(label),
       weekday: Value(weekday),
+      reminderTime: reminderTime == null && nullToAbsent
+          ? const Value.absent()
+          : Value(reminderTime),
       isActive: Value(isActive),
     );
   }
@@ -2855,6 +3694,7 @@ class MealPrepTask extends DataClass implements Insertable<MealPrepTask> {
       id: serializer.fromJson<int>(json['id']),
       label: serializer.fromJson<String>(json['label']),
       weekday: serializer.fromJson<int>(json['weekday']),
+      reminderTime: serializer.fromJson<String?>(json['reminderTime']),
       isActive: serializer.fromJson<bool>(json['isActive']),
     );
   }
@@ -2865,6 +3705,7 @@ class MealPrepTask extends DataClass implements Insertable<MealPrepTask> {
       'id': serializer.toJson<int>(id),
       'label': serializer.toJson<String>(label),
       'weekday': serializer.toJson<int>(weekday),
+      'reminderTime': serializer.toJson<String?>(reminderTime),
       'isActive': serializer.toJson<bool>(isActive),
     };
   }
@@ -2873,11 +3714,13 @@ class MealPrepTask extends DataClass implements Insertable<MealPrepTask> {
     int? id,
     String? label,
     int? weekday,
+    Value<String?> reminderTime = const Value.absent(),
     bool? isActive,
   }) => MealPrepTask(
     id: id ?? this.id,
     label: label ?? this.label,
     weekday: weekday ?? this.weekday,
+    reminderTime: reminderTime.present ? reminderTime.value : this.reminderTime,
     isActive: isActive ?? this.isActive,
   );
   MealPrepTask copyWithCompanion(MealPrepTasksCompanion data) {
@@ -2885,6 +3728,9 @@ class MealPrepTask extends DataClass implements Insertable<MealPrepTask> {
       id: data.id.present ? data.id.value : this.id,
       label: data.label.present ? data.label.value : this.label,
       weekday: data.weekday.present ? data.weekday.value : this.weekday,
+      reminderTime: data.reminderTime.present
+          ? data.reminderTime.value
+          : this.reminderTime,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
     );
   }
@@ -2895,13 +3741,14 @@ class MealPrepTask extends DataClass implements Insertable<MealPrepTask> {
           ..write('id: $id, ')
           ..write('label: $label, ')
           ..write('weekday: $weekday, ')
+          ..write('reminderTime: $reminderTime, ')
           ..write('isActive: $isActive')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, label, weekday, isActive);
+  int get hashCode => Object.hash(id, label, weekday, reminderTime, isActive);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2909,6 +3756,7 @@ class MealPrepTask extends DataClass implements Insertable<MealPrepTask> {
           other.id == this.id &&
           other.label == this.label &&
           other.weekday == this.weekday &&
+          other.reminderTime == this.reminderTime &&
           other.isActive == this.isActive);
 }
 
@@ -2916,17 +3764,20 @@ class MealPrepTasksCompanion extends UpdateCompanion<MealPrepTask> {
   final Value<int> id;
   final Value<String> label;
   final Value<int> weekday;
+  final Value<String?> reminderTime;
   final Value<bool> isActive;
   const MealPrepTasksCompanion({
     this.id = const Value.absent(),
     this.label = const Value.absent(),
     this.weekday = const Value.absent(),
+    this.reminderTime = const Value.absent(),
     this.isActive = const Value.absent(),
   });
   MealPrepTasksCompanion.insert({
     this.id = const Value.absent(),
     required String label,
     required int weekday,
+    this.reminderTime = const Value.absent(),
     this.isActive = const Value.absent(),
   }) : label = Value(label),
        weekday = Value(weekday);
@@ -2934,12 +3785,14 @@ class MealPrepTasksCompanion extends UpdateCompanion<MealPrepTask> {
     Expression<int>? id,
     Expression<String>? label,
     Expression<int>? weekday,
+    Expression<String>? reminderTime,
     Expression<bool>? isActive,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (label != null) 'label': label,
       if (weekday != null) 'weekday': weekday,
+      if (reminderTime != null) 'reminder_time': reminderTime,
       if (isActive != null) 'is_active': isActive,
     });
   }
@@ -2948,12 +3801,14 @@ class MealPrepTasksCompanion extends UpdateCompanion<MealPrepTask> {
     Value<int>? id,
     Value<String>? label,
     Value<int>? weekday,
+    Value<String?>? reminderTime,
     Value<bool>? isActive,
   }) {
     return MealPrepTasksCompanion(
       id: id ?? this.id,
       label: label ?? this.label,
       weekday: weekday ?? this.weekday,
+      reminderTime: reminderTime ?? this.reminderTime,
       isActive: isActive ?? this.isActive,
     );
   }
@@ -2970,6 +3825,9 @@ class MealPrepTasksCompanion extends UpdateCompanion<MealPrepTask> {
     if (weekday.present) {
       map['weekday'] = Variable<int>(weekday.value);
     }
+    if (reminderTime.present) {
+      map['reminder_time'] = Variable<String>(reminderTime.value);
+    }
     if (isActive.present) {
       map['is_active'] = Variable<bool>(isActive.value);
     }
@@ -2982,6 +3840,7 @@ class MealPrepTasksCompanion extends UpdateCompanion<MealPrepTask> {
           ..write('id: $id, ')
           ..write('label: $label, ')
           ..write('weekday: $weekday, ')
+          ..write('reminderTime: $reminderTime, ')
           ..write('isActive: $isActive')
           ..write(')'))
         .toString();
@@ -3747,6 +4606,68 @@ class $AppSettingsTable extends AppSettings
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _hydrationEnabledMeta = const VerificationMeta(
+    'hydrationEnabled',
+  );
+  @override
+  late final GeneratedColumn<bool> hydrationEnabled = GeneratedColumn<bool>(
+    'hydration_enabled',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("hydration_enabled" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _hydrationGoalMlMeta = const VerificationMeta(
+    'hydrationGoalMl',
+  );
+  @override
+  late final GeneratedColumn<int> hydrationGoalMl = GeneratedColumn<int>(
+    'hydration_goal_ml',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(3000),
+  );
+  static const VerificationMeta _hydrationIntervalMinMeta =
+      const VerificationMeta('hydrationIntervalMin');
+  @override
+  late final GeneratedColumn<int> hydrationIntervalMin = GeneratedColumn<int>(
+    'hydration_interval_min',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(120),
+  );
+  static const VerificationMeta _hydrationStartMeta = const VerificationMeta(
+    'hydrationStart',
+  );
+  @override
+  late final GeneratedColumn<String> hydrationStart = GeneratedColumn<String>(
+    'hydration_start',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('08:00'),
+  );
+  static const VerificationMeta _hydrationEndMeta = const VerificationMeta(
+    'hydrationEnd',
+  );
+  @override
+  late final GeneratedColumn<String> hydrationEnd = GeneratedColumn<String>(
+    'hydration_end',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('22:00'),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -3757,6 +4678,11 @@ class $AppSettingsTable extends AppSettings
     weightUnit,
     themeMode,
     hasSeenTour,
+    hydrationEnabled,
+    hydrationGoalMl,
+    hydrationIntervalMin,
+    hydrationStart,
+    hydrationEnd,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -3830,6 +4756,51 @@ class $AppSettingsTable extends AppSettings
         ),
       );
     }
+    if (data.containsKey('hydration_enabled')) {
+      context.handle(
+        _hydrationEnabledMeta,
+        hydrationEnabled.isAcceptableOrUnknown(
+          data['hydration_enabled']!,
+          _hydrationEnabledMeta,
+        ),
+      );
+    }
+    if (data.containsKey('hydration_goal_ml')) {
+      context.handle(
+        _hydrationGoalMlMeta,
+        hydrationGoalMl.isAcceptableOrUnknown(
+          data['hydration_goal_ml']!,
+          _hydrationGoalMlMeta,
+        ),
+      );
+    }
+    if (data.containsKey('hydration_interval_min')) {
+      context.handle(
+        _hydrationIntervalMinMeta,
+        hydrationIntervalMin.isAcceptableOrUnknown(
+          data['hydration_interval_min']!,
+          _hydrationIntervalMinMeta,
+        ),
+      );
+    }
+    if (data.containsKey('hydration_start')) {
+      context.handle(
+        _hydrationStartMeta,
+        hydrationStart.isAcceptableOrUnknown(
+          data['hydration_start']!,
+          _hydrationStartMeta,
+        ),
+      );
+    }
+    if (data.containsKey('hydration_end')) {
+      context.handle(
+        _hydrationEndMeta,
+        hydrationEnd.isAcceptableOrUnknown(
+          data['hydration_end']!,
+          _hydrationEndMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -3871,6 +4842,26 @@ class $AppSettingsTable extends AppSettings
         DriftSqlType.bool,
         data['${effectivePrefix}has_seen_tour'],
       )!,
+      hydrationEnabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}hydration_enabled'],
+      )!,
+      hydrationGoalMl: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}hydration_goal_ml'],
+      )!,
+      hydrationIntervalMin: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}hydration_interval_min'],
+      )!,
+      hydrationStart: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}hydration_start'],
+      )!,
+      hydrationEnd: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}hydration_end'],
+      )!,
     );
   }
 
@@ -3889,6 +4880,11 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
   final String weightUnit;
   final String themeMode;
   final bool hasSeenTour;
+  final bool hydrationEnabled;
+  final int hydrationGoalMl;
+  final int hydrationIntervalMin;
+  final String hydrationStart;
+  final String hydrationEnd;
   const AppSetting({
     required this.id,
     required this.notifyDayBefore,
@@ -3898,6 +4894,11 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
     required this.weightUnit,
     required this.themeMode,
     required this.hasSeenTour,
+    required this.hydrationEnabled,
+    required this.hydrationGoalMl,
+    required this.hydrationIntervalMin,
+    required this.hydrationStart,
+    required this.hydrationEnd,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -3912,6 +4913,11 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
     map['weight_unit'] = Variable<String>(weightUnit);
     map['theme_mode'] = Variable<String>(themeMode);
     map['has_seen_tour'] = Variable<bool>(hasSeenTour);
+    map['hydration_enabled'] = Variable<bool>(hydrationEnabled);
+    map['hydration_goal_ml'] = Variable<int>(hydrationGoalMl);
+    map['hydration_interval_min'] = Variable<int>(hydrationIntervalMin);
+    map['hydration_start'] = Variable<String>(hydrationStart);
+    map['hydration_end'] = Variable<String>(hydrationEnd);
     return map;
   }
 
@@ -3927,6 +4933,11 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
       weightUnit: Value(weightUnit),
       themeMode: Value(themeMode),
       hasSeenTour: Value(hasSeenTour),
+      hydrationEnabled: Value(hydrationEnabled),
+      hydrationGoalMl: Value(hydrationGoalMl),
+      hydrationIntervalMin: Value(hydrationIntervalMin),
+      hydrationStart: Value(hydrationStart),
+      hydrationEnd: Value(hydrationEnd),
     );
   }
 
@@ -3944,6 +4955,13 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
       weightUnit: serializer.fromJson<String>(json['weightUnit']),
       themeMode: serializer.fromJson<String>(json['themeMode']),
       hasSeenTour: serializer.fromJson<bool>(json['hasSeenTour']),
+      hydrationEnabled: serializer.fromJson<bool>(json['hydrationEnabled']),
+      hydrationGoalMl: serializer.fromJson<int>(json['hydrationGoalMl']),
+      hydrationIntervalMin: serializer.fromJson<int>(
+        json['hydrationIntervalMin'],
+      ),
+      hydrationStart: serializer.fromJson<String>(json['hydrationStart']),
+      hydrationEnd: serializer.fromJson<String>(json['hydrationEnd']),
     );
   }
   @override
@@ -3958,6 +4976,11 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
       'weightUnit': serializer.toJson<String>(weightUnit),
       'themeMode': serializer.toJson<String>(themeMode),
       'hasSeenTour': serializer.toJson<bool>(hasSeenTour),
+      'hydrationEnabled': serializer.toJson<bool>(hydrationEnabled),
+      'hydrationGoalMl': serializer.toJson<int>(hydrationGoalMl),
+      'hydrationIntervalMin': serializer.toJson<int>(hydrationIntervalMin),
+      'hydrationStart': serializer.toJson<String>(hydrationStart),
+      'hydrationEnd': serializer.toJson<String>(hydrationEnd),
     };
   }
 
@@ -3970,6 +4993,11 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
     String? weightUnit,
     String? themeMode,
     bool? hasSeenTour,
+    bool? hydrationEnabled,
+    int? hydrationGoalMl,
+    int? hydrationIntervalMin,
+    String? hydrationStart,
+    String? hydrationEnd,
   }) => AppSetting(
     id: id ?? this.id,
     notifyDayBefore: notifyDayBefore ?? this.notifyDayBefore,
@@ -3981,6 +5009,11 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
     weightUnit: weightUnit ?? this.weightUnit,
     themeMode: themeMode ?? this.themeMode,
     hasSeenTour: hasSeenTour ?? this.hasSeenTour,
+    hydrationEnabled: hydrationEnabled ?? this.hydrationEnabled,
+    hydrationGoalMl: hydrationGoalMl ?? this.hydrationGoalMl,
+    hydrationIntervalMin: hydrationIntervalMin ?? this.hydrationIntervalMin,
+    hydrationStart: hydrationStart ?? this.hydrationStart,
+    hydrationEnd: hydrationEnd ?? this.hydrationEnd,
   );
   AppSetting copyWithCompanion(AppSettingsCompanion data) {
     return AppSetting(
@@ -4004,6 +5037,21 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
       hasSeenTour: data.hasSeenTour.present
           ? data.hasSeenTour.value
           : this.hasSeenTour,
+      hydrationEnabled: data.hydrationEnabled.present
+          ? data.hydrationEnabled.value
+          : this.hydrationEnabled,
+      hydrationGoalMl: data.hydrationGoalMl.present
+          ? data.hydrationGoalMl.value
+          : this.hydrationGoalMl,
+      hydrationIntervalMin: data.hydrationIntervalMin.present
+          ? data.hydrationIntervalMin.value
+          : this.hydrationIntervalMin,
+      hydrationStart: data.hydrationStart.present
+          ? data.hydrationStart.value
+          : this.hydrationStart,
+      hydrationEnd: data.hydrationEnd.present
+          ? data.hydrationEnd.value
+          : this.hydrationEnd,
     );
   }
 
@@ -4017,7 +5065,12 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
           ..write('bedtimeTarget: $bedtimeTarget, ')
           ..write('weightUnit: $weightUnit, ')
           ..write('themeMode: $themeMode, ')
-          ..write('hasSeenTour: $hasSeenTour')
+          ..write('hasSeenTour: $hasSeenTour, ')
+          ..write('hydrationEnabled: $hydrationEnabled, ')
+          ..write('hydrationGoalMl: $hydrationGoalMl, ')
+          ..write('hydrationIntervalMin: $hydrationIntervalMin, ')
+          ..write('hydrationStart: $hydrationStart, ')
+          ..write('hydrationEnd: $hydrationEnd')
           ..write(')'))
         .toString();
   }
@@ -4032,6 +5085,11 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
     weightUnit,
     themeMode,
     hasSeenTour,
+    hydrationEnabled,
+    hydrationGoalMl,
+    hydrationIntervalMin,
+    hydrationStart,
+    hydrationEnd,
   );
   @override
   bool operator ==(Object other) =>
@@ -4044,7 +5102,12 @@ class AppSetting extends DataClass implements Insertable<AppSetting> {
           other.bedtimeTarget == this.bedtimeTarget &&
           other.weightUnit == this.weightUnit &&
           other.themeMode == this.themeMode &&
-          other.hasSeenTour == this.hasSeenTour);
+          other.hasSeenTour == this.hasSeenTour &&
+          other.hydrationEnabled == this.hydrationEnabled &&
+          other.hydrationGoalMl == this.hydrationGoalMl &&
+          other.hydrationIntervalMin == this.hydrationIntervalMin &&
+          other.hydrationStart == this.hydrationStart &&
+          other.hydrationEnd == this.hydrationEnd);
 }
 
 class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
@@ -4056,6 +5119,11 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
   final Value<String> weightUnit;
   final Value<String> themeMode;
   final Value<bool> hasSeenTour;
+  final Value<bool> hydrationEnabled;
+  final Value<int> hydrationGoalMl;
+  final Value<int> hydrationIntervalMin;
+  final Value<String> hydrationStart;
+  final Value<String> hydrationEnd;
   const AppSettingsCompanion({
     this.id = const Value.absent(),
     this.notifyDayBefore = const Value.absent(),
@@ -4065,6 +5133,11 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
     this.weightUnit = const Value.absent(),
     this.themeMode = const Value.absent(),
     this.hasSeenTour = const Value.absent(),
+    this.hydrationEnabled = const Value.absent(),
+    this.hydrationGoalMl = const Value.absent(),
+    this.hydrationIntervalMin = const Value.absent(),
+    this.hydrationStart = const Value.absent(),
+    this.hydrationEnd = const Value.absent(),
   });
   AppSettingsCompanion.insert({
     this.id = const Value.absent(),
@@ -4075,6 +5148,11 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
     this.weightUnit = const Value.absent(),
     this.themeMode = const Value.absent(),
     this.hasSeenTour = const Value.absent(),
+    this.hydrationEnabled = const Value.absent(),
+    this.hydrationGoalMl = const Value.absent(),
+    this.hydrationIntervalMin = const Value.absent(),
+    this.hydrationStart = const Value.absent(),
+    this.hydrationEnd = const Value.absent(),
   });
   static Insertable<AppSetting> custom({
     Expression<int>? id,
@@ -4085,6 +5163,11 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
     Expression<String>? weightUnit,
     Expression<String>? themeMode,
     Expression<bool>? hasSeenTour,
+    Expression<bool>? hydrationEnabled,
+    Expression<int>? hydrationGoalMl,
+    Expression<int>? hydrationIntervalMin,
+    Expression<String>? hydrationStart,
+    Expression<String>? hydrationEnd,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -4095,6 +5178,12 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
       if (weightUnit != null) 'weight_unit': weightUnit,
       if (themeMode != null) 'theme_mode': themeMode,
       if (hasSeenTour != null) 'has_seen_tour': hasSeenTour,
+      if (hydrationEnabled != null) 'hydration_enabled': hydrationEnabled,
+      if (hydrationGoalMl != null) 'hydration_goal_ml': hydrationGoalMl,
+      if (hydrationIntervalMin != null)
+        'hydration_interval_min': hydrationIntervalMin,
+      if (hydrationStart != null) 'hydration_start': hydrationStart,
+      if (hydrationEnd != null) 'hydration_end': hydrationEnd,
     });
   }
 
@@ -4107,6 +5196,11 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
     Value<String>? weightUnit,
     Value<String>? themeMode,
     Value<bool>? hasSeenTour,
+    Value<bool>? hydrationEnabled,
+    Value<int>? hydrationGoalMl,
+    Value<int>? hydrationIntervalMin,
+    Value<String>? hydrationStart,
+    Value<String>? hydrationEnd,
   }) {
     return AppSettingsCompanion(
       id: id ?? this.id,
@@ -4117,6 +5211,11 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
       weightUnit: weightUnit ?? this.weightUnit,
       themeMode: themeMode ?? this.themeMode,
       hasSeenTour: hasSeenTour ?? this.hasSeenTour,
+      hydrationEnabled: hydrationEnabled ?? this.hydrationEnabled,
+      hydrationGoalMl: hydrationGoalMl ?? this.hydrationGoalMl,
+      hydrationIntervalMin: hydrationIntervalMin ?? this.hydrationIntervalMin,
+      hydrationStart: hydrationStart ?? this.hydrationStart,
+      hydrationEnd: hydrationEnd ?? this.hydrationEnd,
     );
   }
 
@@ -4147,6 +5246,21 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
     if (hasSeenTour.present) {
       map['has_seen_tour'] = Variable<bool>(hasSeenTour.value);
     }
+    if (hydrationEnabled.present) {
+      map['hydration_enabled'] = Variable<bool>(hydrationEnabled.value);
+    }
+    if (hydrationGoalMl.present) {
+      map['hydration_goal_ml'] = Variable<int>(hydrationGoalMl.value);
+    }
+    if (hydrationIntervalMin.present) {
+      map['hydration_interval_min'] = Variable<int>(hydrationIntervalMin.value);
+    }
+    if (hydrationStart.present) {
+      map['hydration_start'] = Variable<String>(hydrationStart.value);
+    }
+    if (hydrationEnd.present) {
+      map['hydration_end'] = Variable<String>(hydrationEnd.value);
+    }
     return map;
   }
 
@@ -4160,7 +5274,1295 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
           ..write('bedtimeTarget: $bedtimeTarget, ')
           ..write('weightUnit: $weightUnit, ')
           ..write('themeMode: $themeMode, ')
-          ..write('hasSeenTour: $hasSeenTour')
+          ..write('hasSeenTour: $hasSeenTour, ')
+          ..write('hydrationEnabled: $hydrationEnabled, ')
+          ..write('hydrationGoalMl: $hydrationGoalMl, ')
+          ..write('hydrationIntervalMin: $hydrationIntervalMin, ')
+          ..write('hydrationStart: $hydrationStart, ')
+          ..write('hydrationEnd: $hydrationEnd')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $CategoriesTable extends Categories
+    with TableInfo<$CategoriesTable, Category> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CategoriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'),
+  );
+  static const VerificationMeta _orderIndexMeta = const VerificationMeta(
+    'orderIndex',
+  );
+  @override
+  late final GeneratedColumn<int> orderIndex = GeneratedColumn<int>(
+    'order_index',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, name, orderIndex];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'categories';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<Category> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('order_index')) {
+      context.handle(
+        _orderIndexMeta,
+        orderIndex.isAcceptableOrUnknown(data['order_index']!, _orderIndexMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Category map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Category(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      orderIndex: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}order_index'],
+      )!,
+    );
+  }
+
+  @override
+  $CategoriesTable createAlias(String alias) {
+    return $CategoriesTable(attachedDatabase, alias);
+  }
+}
+
+class Category extends DataClass implements Insertable<Category> {
+  final int id;
+  final String name;
+  final int orderIndex;
+  const Category({
+    required this.id,
+    required this.name,
+    required this.orderIndex,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['name'] = Variable<String>(name);
+    map['order_index'] = Variable<int>(orderIndex);
+    return map;
+  }
+
+  CategoriesCompanion toCompanion(bool nullToAbsent) {
+    return CategoriesCompanion(
+      id: Value(id),
+      name: Value(name),
+      orderIndex: Value(orderIndex),
+    );
+  }
+
+  factory Category.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Category(
+      id: serializer.fromJson<int>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      orderIndex: serializer.fromJson<int>(json['orderIndex']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'name': serializer.toJson<String>(name),
+      'orderIndex': serializer.toJson<int>(orderIndex),
+    };
+  }
+
+  Category copyWith({int? id, String? name, int? orderIndex}) => Category(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    orderIndex: orderIndex ?? this.orderIndex,
+  );
+  Category copyWithCompanion(CategoriesCompanion data) {
+    return Category(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      orderIndex: data.orderIndex.present
+          ? data.orderIndex.value
+          : this.orderIndex,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Category(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('orderIndex: $orderIndex')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, orderIndex);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Category &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.orderIndex == this.orderIndex);
+}
+
+class CategoriesCompanion extends UpdateCompanion<Category> {
+  final Value<int> id;
+  final Value<String> name;
+  final Value<int> orderIndex;
+  const CategoriesCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.orderIndex = const Value.absent(),
+  });
+  CategoriesCompanion.insert({
+    this.id = const Value.absent(),
+    required String name,
+    this.orderIndex = const Value.absent(),
+  }) : name = Value(name);
+  static Insertable<Category> custom({
+    Expression<int>? id,
+    Expression<String>? name,
+    Expression<int>? orderIndex,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (orderIndex != null) 'order_index': orderIndex,
+    });
+  }
+
+  CategoriesCompanion copyWith({
+    Value<int>? id,
+    Value<String>? name,
+    Value<int>? orderIndex,
+  }) {
+    return CategoriesCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      orderIndex: orderIndex ?? this.orderIndex,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (orderIndex.present) {
+      map['order_index'] = Variable<int>(orderIndex.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CategoriesCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('orderIndex: $orderIndex')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ShoppingItemsTable extends ShoppingItems
+    with TableInfo<$ShoppingItemsTable, ShoppingItem> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ShoppingItemsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _listIdMeta = const VerificationMeta('listId');
+  @override
+  late final GeneratedColumn<int> listId = GeneratedColumn<int>(
+    'list_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _labelMeta = const VerificationMeta('label');
+  @override
+  late final GeneratedColumn<String> label = GeneratedColumn<String>(
+    'label',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _orderIndexMeta = const VerificationMeta(
+    'orderIndex',
+  );
+  @override
+  late final GeneratedColumn<int> orderIndex = GeneratedColumn<int>(
+    'order_index',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _isBoughtMeta = const VerificationMeta(
+    'isBought',
+  );
+  @override
+  late final GeneratedColumn<bool> isBought = GeneratedColumn<bool>(
+    'is_bought',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_bought" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    listId,
+    label,
+    orderIndex,
+    isBought,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'shopping_items';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ShoppingItem> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('list_id')) {
+      context.handle(
+        _listIdMeta,
+        listId.isAcceptableOrUnknown(data['list_id']!, _listIdMeta),
+      );
+    }
+    if (data.containsKey('label')) {
+      context.handle(
+        _labelMeta,
+        label.isAcceptableOrUnknown(data['label']!, _labelMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_labelMeta);
+    }
+    if (data.containsKey('order_index')) {
+      context.handle(
+        _orderIndexMeta,
+        orderIndex.isAcceptableOrUnknown(data['order_index']!, _orderIndexMeta),
+      );
+    }
+    if (data.containsKey('is_bought')) {
+      context.handle(
+        _isBoughtMeta,
+        isBought.isAcceptableOrUnknown(data['is_bought']!, _isBoughtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ShoppingItem map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ShoppingItem(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      listId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}list_id'],
+      ),
+      label: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}label'],
+      )!,
+      orderIndex: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}order_index'],
+      )!,
+      isBought: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_bought'],
+      )!,
+    );
+  }
+
+  @override
+  $ShoppingItemsTable createAlias(String alias) {
+    return $ShoppingItemsTable(attachedDatabase, alias);
+  }
+}
+
+class ShoppingItem extends DataClass implements Insertable<ShoppingItem> {
+  final int id;
+  final int? listId;
+  final String label;
+  final int orderIndex;
+  final bool isBought;
+  const ShoppingItem({
+    required this.id,
+    this.listId,
+    required this.label,
+    required this.orderIndex,
+    required this.isBought,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    if (!nullToAbsent || listId != null) {
+      map['list_id'] = Variable<int>(listId);
+    }
+    map['label'] = Variable<String>(label);
+    map['order_index'] = Variable<int>(orderIndex);
+    map['is_bought'] = Variable<bool>(isBought);
+    return map;
+  }
+
+  ShoppingItemsCompanion toCompanion(bool nullToAbsent) {
+    return ShoppingItemsCompanion(
+      id: Value(id),
+      listId: listId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(listId),
+      label: Value(label),
+      orderIndex: Value(orderIndex),
+      isBought: Value(isBought),
+    );
+  }
+
+  factory ShoppingItem.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ShoppingItem(
+      id: serializer.fromJson<int>(json['id']),
+      listId: serializer.fromJson<int?>(json['listId']),
+      label: serializer.fromJson<String>(json['label']),
+      orderIndex: serializer.fromJson<int>(json['orderIndex']),
+      isBought: serializer.fromJson<bool>(json['isBought']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'listId': serializer.toJson<int?>(listId),
+      'label': serializer.toJson<String>(label),
+      'orderIndex': serializer.toJson<int>(orderIndex),
+      'isBought': serializer.toJson<bool>(isBought),
+    };
+  }
+
+  ShoppingItem copyWith({
+    int? id,
+    Value<int?> listId = const Value.absent(),
+    String? label,
+    int? orderIndex,
+    bool? isBought,
+  }) => ShoppingItem(
+    id: id ?? this.id,
+    listId: listId.present ? listId.value : this.listId,
+    label: label ?? this.label,
+    orderIndex: orderIndex ?? this.orderIndex,
+    isBought: isBought ?? this.isBought,
+  );
+  ShoppingItem copyWithCompanion(ShoppingItemsCompanion data) {
+    return ShoppingItem(
+      id: data.id.present ? data.id.value : this.id,
+      listId: data.listId.present ? data.listId.value : this.listId,
+      label: data.label.present ? data.label.value : this.label,
+      orderIndex: data.orderIndex.present
+          ? data.orderIndex.value
+          : this.orderIndex,
+      isBought: data.isBought.present ? data.isBought.value : this.isBought,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ShoppingItem(')
+          ..write('id: $id, ')
+          ..write('listId: $listId, ')
+          ..write('label: $label, ')
+          ..write('orderIndex: $orderIndex, ')
+          ..write('isBought: $isBought')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, listId, label, orderIndex, isBought);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ShoppingItem &&
+          other.id == this.id &&
+          other.listId == this.listId &&
+          other.label == this.label &&
+          other.orderIndex == this.orderIndex &&
+          other.isBought == this.isBought);
+}
+
+class ShoppingItemsCompanion extends UpdateCompanion<ShoppingItem> {
+  final Value<int> id;
+  final Value<int?> listId;
+  final Value<String> label;
+  final Value<int> orderIndex;
+  final Value<bool> isBought;
+  const ShoppingItemsCompanion({
+    this.id = const Value.absent(),
+    this.listId = const Value.absent(),
+    this.label = const Value.absent(),
+    this.orderIndex = const Value.absent(),
+    this.isBought = const Value.absent(),
+  });
+  ShoppingItemsCompanion.insert({
+    this.id = const Value.absent(),
+    this.listId = const Value.absent(),
+    required String label,
+    this.orderIndex = const Value.absent(),
+    this.isBought = const Value.absent(),
+  }) : label = Value(label);
+  static Insertable<ShoppingItem> custom({
+    Expression<int>? id,
+    Expression<int>? listId,
+    Expression<String>? label,
+    Expression<int>? orderIndex,
+    Expression<bool>? isBought,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (listId != null) 'list_id': listId,
+      if (label != null) 'label': label,
+      if (orderIndex != null) 'order_index': orderIndex,
+      if (isBought != null) 'is_bought': isBought,
+    });
+  }
+
+  ShoppingItemsCompanion copyWith({
+    Value<int>? id,
+    Value<int?>? listId,
+    Value<String>? label,
+    Value<int>? orderIndex,
+    Value<bool>? isBought,
+  }) {
+    return ShoppingItemsCompanion(
+      id: id ?? this.id,
+      listId: listId ?? this.listId,
+      label: label ?? this.label,
+      orderIndex: orderIndex ?? this.orderIndex,
+      isBought: isBought ?? this.isBought,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (listId.present) {
+      map['list_id'] = Variable<int>(listId.value);
+    }
+    if (label.present) {
+      map['label'] = Variable<String>(label.value);
+    }
+    if (orderIndex.present) {
+      map['order_index'] = Variable<int>(orderIndex.value);
+    }
+    if (isBought.present) {
+      map['is_bought'] = Variable<bool>(isBought.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ShoppingItemsCompanion(')
+          ..write('id: $id, ')
+          ..write('listId: $listId, ')
+          ..write('label: $label, ')
+          ..write('orderIndex: $orderIndex, ')
+          ..write('isBought: $isBought')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $RoutineListsTable extends RoutineLists
+    with TableInfo<$RoutineListsTable, RoutineList> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RoutineListsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('checklist'),
+  );
+  static const VerificationMeta _orderIndexMeta = const VerificationMeta(
+    'orderIndex',
+  );
+  @override
+  late final GeneratedColumn<int> orderIndex = GeneratedColumn<int>(
+    'order_index',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _isActiveMeta = const VerificationMeta(
+    'isActive',
+  );
+  @override
+  late final GeneratedColumn<bool> isActive = GeneratedColumn<bool>(
+    'is_active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, name, kind, orderIndex, isActive];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'routine_lists';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<RoutineList> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    }
+    if (data.containsKey('order_index')) {
+      context.handle(
+        _orderIndexMeta,
+        orderIndex.isAcceptableOrUnknown(data['order_index']!, _orderIndexMeta),
+      );
+    }
+    if (data.containsKey('is_active')) {
+      context.handle(
+        _isActiveMeta,
+        isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  RoutineList map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RoutineList(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      orderIndex: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}order_index'],
+      )!,
+      isActive: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_active'],
+      )!,
+    );
+  }
+
+  @override
+  $RoutineListsTable createAlias(String alias) {
+    return $RoutineListsTable(attachedDatabase, alias);
+  }
+}
+
+class RoutineList extends DataClass implements Insertable<RoutineList> {
+  final int id;
+  final String name;
+  final String kind;
+  final int orderIndex;
+  final bool isActive;
+  const RoutineList({
+    required this.id,
+    required this.name,
+    required this.kind,
+    required this.orderIndex,
+    required this.isActive,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['name'] = Variable<String>(name);
+    map['kind'] = Variable<String>(kind);
+    map['order_index'] = Variable<int>(orderIndex);
+    map['is_active'] = Variable<bool>(isActive);
+    return map;
+  }
+
+  RoutineListsCompanion toCompanion(bool nullToAbsent) {
+    return RoutineListsCompanion(
+      id: Value(id),
+      name: Value(name),
+      kind: Value(kind),
+      orderIndex: Value(orderIndex),
+      isActive: Value(isActive),
+    );
+  }
+
+  factory RoutineList.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RoutineList(
+      id: serializer.fromJson<int>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      kind: serializer.fromJson<String>(json['kind']),
+      orderIndex: serializer.fromJson<int>(json['orderIndex']),
+      isActive: serializer.fromJson<bool>(json['isActive']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'name': serializer.toJson<String>(name),
+      'kind': serializer.toJson<String>(kind),
+      'orderIndex': serializer.toJson<int>(orderIndex),
+      'isActive': serializer.toJson<bool>(isActive),
+    };
+  }
+
+  RoutineList copyWith({
+    int? id,
+    String? name,
+    String? kind,
+    int? orderIndex,
+    bool? isActive,
+  }) => RoutineList(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    kind: kind ?? this.kind,
+    orderIndex: orderIndex ?? this.orderIndex,
+    isActive: isActive ?? this.isActive,
+  );
+  RoutineList copyWithCompanion(RoutineListsCompanion data) {
+    return RoutineList(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      orderIndex: data.orderIndex.present
+          ? data.orderIndex.value
+          : this.orderIndex,
+      isActive: data.isActive.present ? data.isActive.value : this.isActive,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RoutineList(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('kind: $kind, ')
+          ..write('orderIndex: $orderIndex, ')
+          ..write('isActive: $isActive')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, kind, orderIndex, isActive);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RoutineList &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.kind == this.kind &&
+          other.orderIndex == this.orderIndex &&
+          other.isActive == this.isActive);
+}
+
+class RoutineListsCompanion extends UpdateCompanion<RoutineList> {
+  final Value<int> id;
+  final Value<String> name;
+  final Value<String> kind;
+  final Value<int> orderIndex;
+  final Value<bool> isActive;
+  const RoutineListsCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.orderIndex = const Value.absent(),
+    this.isActive = const Value.absent(),
+  });
+  RoutineListsCompanion.insert({
+    this.id = const Value.absent(),
+    required String name,
+    this.kind = const Value.absent(),
+    this.orderIndex = const Value.absent(),
+    this.isActive = const Value.absent(),
+  }) : name = Value(name);
+  static Insertable<RoutineList> custom({
+    Expression<int>? id,
+    Expression<String>? name,
+    Expression<String>? kind,
+    Expression<int>? orderIndex,
+    Expression<bool>? isActive,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (kind != null) 'kind': kind,
+      if (orderIndex != null) 'order_index': orderIndex,
+      if (isActive != null) 'is_active': isActive,
+    });
+  }
+
+  RoutineListsCompanion copyWith({
+    Value<int>? id,
+    Value<String>? name,
+    Value<String>? kind,
+    Value<int>? orderIndex,
+    Value<bool>? isActive,
+  }) {
+    return RoutineListsCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      kind: kind ?? this.kind,
+      orderIndex: orderIndex ?? this.orderIndex,
+      isActive: isActive ?? this.isActive,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (orderIndex.present) {
+      map['order_index'] = Variable<int>(orderIndex.value);
+    }
+    if (isActive.present) {
+      map['is_active'] = Variable<bool>(isActive.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RoutineListsCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('kind: $kind, ')
+          ..write('orderIndex: $orderIndex, ')
+          ..write('isActive: $isActive')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $HydrationLogsTable extends HydrationLogs
+    with TableInfo<$HydrationLogsTable, HydrationLog> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $HydrationLogsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _itemIdMeta = const VerificationMeta('itemId');
+  @override
+  late final GeneratedColumn<int> itemId = GeneratedColumn<int>(
+    'item_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _dateMeta = const VerificationMeta('date');
+  @override
+  late final GeneratedColumn<DateTime> date = GeneratedColumn<DateTime>(
+    'date',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _amountMlMeta = const VerificationMeta(
+    'amountMl',
+  );
+  @override
+  late final GeneratedColumn<int> amountMl = GeneratedColumn<int>(
+    'amount_ml',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _loggedAtMeta = const VerificationMeta(
+    'loggedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> loggedAt = GeneratedColumn<DateTime>(
+    'logged_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, itemId, date, amountMl, loggedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'hydration_logs';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<HydrationLog> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('item_id')) {
+      context.handle(
+        _itemIdMeta,
+        itemId.isAcceptableOrUnknown(data['item_id']!, _itemIdMeta),
+      );
+    }
+    if (data.containsKey('date')) {
+      context.handle(
+        _dateMeta,
+        date.isAcceptableOrUnknown(data['date']!, _dateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_dateMeta);
+    }
+    if (data.containsKey('amount_ml')) {
+      context.handle(
+        _amountMlMeta,
+        amountMl.isAcceptableOrUnknown(data['amount_ml']!, _amountMlMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_amountMlMeta);
+    }
+    if (data.containsKey('logged_at')) {
+      context.handle(
+        _loggedAtMeta,
+        loggedAt.isAcceptableOrUnknown(data['logged_at']!, _loggedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_loggedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  HydrationLog map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return HydrationLog(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      itemId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}item_id'],
+      ),
+      date: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}date'],
+      )!,
+      amountMl: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}amount_ml'],
+      )!,
+      loggedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}logged_at'],
+      )!,
+    );
+  }
+
+  @override
+  $HydrationLogsTable createAlias(String alias) {
+    return $HydrationLogsTable(attachedDatabase, alias);
+  }
+}
+
+class HydrationLog extends DataClass implements Insertable<HydrationLog> {
+  final int id;
+  final int? itemId;
+  final DateTime date;
+  final int amountMl;
+  final DateTime loggedAt;
+  const HydrationLog({
+    required this.id,
+    this.itemId,
+    required this.date,
+    required this.amountMl,
+    required this.loggedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    if (!nullToAbsent || itemId != null) {
+      map['item_id'] = Variable<int>(itemId);
+    }
+    map['date'] = Variable<DateTime>(date);
+    map['amount_ml'] = Variable<int>(amountMl);
+    map['logged_at'] = Variable<DateTime>(loggedAt);
+    return map;
+  }
+
+  HydrationLogsCompanion toCompanion(bool nullToAbsent) {
+    return HydrationLogsCompanion(
+      id: Value(id),
+      itemId: itemId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(itemId),
+      date: Value(date),
+      amountMl: Value(amountMl),
+      loggedAt: Value(loggedAt),
+    );
+  }
+
+  factory HydrationLog.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return HydrationLog(
+      id: serializer.fromJson<int>(json['id']),
+      itemId: serializer.fromJson<int?>(json['itemId']),
+      date: serializer.fromJson<DateTime>(json['date']),
+      amountMl: serializer.fromJson<int>(json['amountMl']),
+      loggedAt: serializer.fromJson<DateTime>(json['loggedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'itemId': serializer.toJson<int?>(itemId),
+      'date': serializer.toJson<DateTime>(date),
+      'amountMl': serializer.toJson<int>(amountMl),
+      'loggedAt': serializer.toJson<DateTime>(loggedAt),
+    };
+  }
+
+  HydrationLog copyWith({
+    int? id,
+    Value<int?> itemId = const Value.absent(),
+    DateTime? date,
+    int? amountMl,
+    DateTime? loggedAt,
+  }) => HydrationLog(
+    id: id ?? this.id,
+    itemId: itemId.present ? itemId.value : this.itemId,
+    date: date ?? this.date,
+    amountMl: amountMl ?? this.amountMl,
+    loggedAt: loggedAt ?? this.loggedAt,
+  );
+  HydrationLog copyWithCompanion(HydrationLogsCompanion data) {
+    return HydrationLog(
+      id: data.id.present ? data.id.value : this.id,
+      itemId: data.itemId.present ? data.itemId.value : this.itemId,
+      date: data.date.present ? data.date.value : this.date,
+      amountMl: data.amountMl.present ? data.amountMl.value : this.amountMl,
+      loggedAt: data.loggedAt.present ? data.loggedAt.value : this.loggedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('HydrationLog(')
+          ..write('id: $id, ')
+          ..write('itemId: $itemId, ')
+          ..write('date: $date, ')
+          ..write('amountMl: $amountMl, ')
+          ..write('loggedAt: $loggedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, itemId, date, amountMl, loggedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is HydrationLog &&
+          other.id == this.id &&
+          other.itemId == this.itemId &&
+          other.date == this.date &&
+          other.amountMl == this.amountMl &&
+          other.loggedAt == this.loggedAt);
+}
+
+class HydrationLogsCompanion extends UpdateCompanion<HydrationLog> {
+  final Value<int> id;
+  final Value<int?> itemId;
+  final Value<DateTime> date;
+  final Value<int> amountMl;
+  final Value<DateTime> loggedAt;
+  const HydrationLogsCompanion({
+    this.id = const Value.absent(),
+    this.itemId = const Value.absent(),
+    this.date = const Value.absent(),
+    this.amountMl = const Value.absent(),
+    this.loggedAt = const Value.absent(),
+  });
+  HydrationLogsCompanion.insert({
+    this.id = const Value.absent(),
+    this.itemId = const Value.absent(),
+    required DateTime date,
+    required int amountMl,
+    required DateTime loggedAt,
+  }) : date = Value(date),
+       amountMl = Value(amountMl),
+       loggedAt = Value(loggedAt);
+  static Insertable<HydrationLog> custom({
+    Expression<int>? id,
+    Expression<int>? itemId,
+    Expression<DateTime>? date,
+    Expression<int>? amountMl,
+    Expression<DateTime>? loggedAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (itemId != null) 'item_id': itemId,
+      if (date != null) 'date': date,
+      if (amountMl != null) 'amount_ml': amountMl,
+      if (loggedAt != null) 'logged_at': loggedAt,
+    });
+  }
+
+  HydrationLogsCompanion copyWith({
+    Value<int>? id,
+    Value<int?>? itemId,
+    Value<DateTime>? date,
+    Value<int>? amountMl,
+    Value<DateTime>? loggedAt,
+  }) {
+    return HydrationLogsCompanion(
+      id: id ?? this.id,
+      itemId: itemId ?? this.itemId,
+      date: date ?? this.date,
+      amountMl: amountMl ?? this.amountMl,
+      loggedAt: loggedAt ?? this.loggedAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (itemId.present) {
+      map['item_id'] = Variable<int>(itemId.value);
+    }
+    if (date.present) {
+      map['date'] = Variable<DateTime>(date.value);
+    }
+    if (amountMl.present) {
+      map['amount_ml'] = Variable<int>(amountMl.value);
+    }
+    if (loggedAt.present) {
+      map['logged_at'] = Variable<DateTime>(loggedAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('HydrationLogsCompanion(')
+          ..write('id: $id, ')
+          ..write('itemId: $itemId, ')
+          ..write('date: $date, ')
+          ..write('amountMl: $amountMl, ')
+          ..write('loggedAt: $loggedAt')
           ..write(')'))
         .toString();
   }
@@ -4186,6 +6588,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $MealPrepChecksTable mealPrepChecks = $MealPrepChecksTable(this);
   late final $BodyLogsTable bodyLogs = $BodyLogsTable(this);
   late final $AppSettingsTable appSettings = $AppSettingsTable(this);
+  late final $CategoriesTable categories = $CategoriesTable(this);
+  late final $ShoppingItemsTable shoppingItems = $ShoppingItemsTable(this);
+  late final $RoutineListsTable routineLists = $RoutineListsTable(this);
+  late final $HydrationLogsTable hydrationLogs = $HydrationLogsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4202,6 +6608,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     mealPrepChecks,
     bodyLogs,
     appSettings,
+    categories,
+    shoppingItems,
+    routineLists,
+    hydrationLogs,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -4641,7 +7051,11 @@ typedef $$PlannedExercisesTableCreateCompanionBuilder =
       Value<int> id,
       required int workoutDayId,
       required String name,
+      Value<String> category,
       Value<int> targetSets,
+      Value<double?> targetWeightKg,
+      Value<String?> cardioMetric,
+      Value<bool> trackPr,
       Value<int> orderIndex,
     });
 typedef $$PlannedExercisesTableUpdateCompanionBuilder =
@@ -4649,7 +7063,11 @@ typedef $$PlannedExercisesTableUpdateCompanionBuilder =
       Value<int> id,
       Value<int> workoutDayId,
       Value<String> name,
+      Value<String> category,
       Value<int> targetSets,
+      Value<double?> targetWeightKg,
+      Value<String?> cardioMetric,
+      Value<bool> trackPr,
       Value<int> orderIndex,
     });
 
@@ -4700,8 +7118,28 @@ class $$PlannedExercisesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<int> get targetSets => $composableBuilder(
     column: $table.targetSets,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get targetWeightKg => $composableBuilder(
+    column: $table.targetWeightKg,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get cardioMetric => $composableBuilder(
+    column: $table.cardioMetric,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get trackPr => $composableBuilder(
+    column: $table.trackPr,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4753,8 +7191,28 @@ class $$PlannedExercisesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get targetSets => $composableBuilder(
     column: $table.targetSets,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get targetWeightKg => $composableBuilder(
+    column: $table.targetWeightKg,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get cardioMetric => $composableBuilder(
+    column: $table.cardioMetric,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get trackPr => $composableBuilder(
+    column: $table.trackPr,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -4802,10 +7260,26 @@ class $$PlannedExercisesTableAnnotationComposer
   GeneratedColumn<String> get name =>
       $composableBuilder(column: $table.name, builder: (column) => column);
 
+  GeneratedColumn<String> get category =>
+      $composableBuilder(column: $table.category, builder: (column) => column);
+
   GeneratedColumn<int> get targetSets => $composableBuilder(
     column: $table.targetSets,
     builder: (column) => column,
   );
+
+  GeneratedColumn<double> get targetWeightKg => $composableBuilder(
+    column: $table.targetWeightKg,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get cardioMetric => $composableBuilder(
+    column: $table.cardioMetric,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get trackPr =>
+      $composableBuilder(column: $table.trackPr, builder: (column) => column);
 
   GeneratedColumn<int> get orderIndex => $composableBuilder(
     column: $table.orderIndex,
@@ -4869,13 +7343,21 @@ class $$PlannedExercisesTableTableManager
                 Value<int> id = const Value.absent(),
                 Value<int> workoutDayId = const Value.absent(),
                 Value<String> name = const Value.absent(),
+                Value<String> category = const Value.absent(),
                 Value<int> targetSets = const Value.absent(),
+                Value<double?> targetWeightKg = const Value.absent(),
+                Value<String?> cardioMetric = const Value.absent(),
+                Value<bool> trackPr = const Value.absent(),
                 Value<int> orderIndex = const Value.absent(),
               }) => PlannedExercisesCompanion(
                 id: id,
                 workoutDayId: workoutDayId,
                 name: name,
+                category: category,
                 targetSets: targetSets,
+                targetWeightKg: targetWeightKg,
+                cardioMetric: cardioMetric,
+                trackPr: trackPr,
                 orderIndex: orderIndex,
               ),
           createCompanionCallback:
@@ -4883,13 +7365,21 @@ class $$PlannedExercisesTableTableManager
                 Value<int> id = const Value.absent(),
                 required int workoutDayId,
                 required String name,
+                Value<String> category = const Value.absent(),
                 Value<int> targetSets = const Value.absent(),
+                Value<double?> targetWeightKg = const Value.absent(),
+                Value<String?> cardioMetric = const Value.absent(),
+                Value<bool> trackPr = const Value.absent(),
                 Value<int> orderIndex = const Value.absent(),
               }) => PlannedExercisesCompanion.insert(
                 id: id,
                 workoutDayId: workoutDayId,
                 name: name,
+                category: category,
                 targetSets: targetSets,
+                targetWeightKg: targetWeightKg,
+                cardioMetric: cardioMetric,
+                trackPr: trackPr,
                 orderIndex: orderIndex,
               ),
           withReferenceMapper: (p0) => p0
@@ -4963,6 +7453,7 @@ typedef $$WorkoutSessionsTableCreateCompanionBuilder =
       required int workoutDayId,
       required DateTime date,
       Value<String?> notes,
+      Value<DateTime?> completedAt,
     });
 typedef $$WorkoutSessionsTableUpdateCompanionBuilder =
     WorkoutSessionsCompanion Function({
@@ -4970,6 +7461,7 @@ typedef $$WorkoutSessionsTableUpdateCompanionBuilder =
       Value<int> workoutDayId,
       Value<DateTime> date,
       Value<String?> notes,
+      Value<DateTime?> completedAt,
     });
 
 final class $$WorkoutSessionsTableReferences
@@ -5040,6 +7532,11 @@ class $$WorkoutSessionsTableFilterComposer
 
   ColumnFilters<String> get notes => $composableBuilder(
     column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get completedAt => $composableBuilder(
+    column: $table.completedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5116,6 +7613,11 @@ class $$WorkoutSessionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get completedAt => $composableBuilder(
+    column: $table.completedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$WorkoutDaysTableOrderingComposer get workoutDayId {
     final $$WorkoutDaysTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -5157,6 +7659,11 @@ class $$WorkoutSessionsTableAnnotationComposer
 
   GeneratedColumn<String> get notes =>
       $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get completedAt => $composableBuilder(
+    column: $table.completedAt,
+    builder: (column) => column,
+  );
 
   $$WorkoutDaysTableAnnotationComposer get workoutDayId {
     final $$WorkoutDaysTableAnnotationComposer composer = $composerBuilder(
@@ -5241,11 +7748,13 @@ class $$WorkoutSessionsTableTableManager
                 Value<int> workoutDayId = const Value.absent(),
                 Value<DateTime> date = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
+                Value<DateTime?> completedAt = const Value.absent(),
               }) => WorkoutSessionsCompanion(
                 id: id,
                 workoutDayId: workoutDayId,
                 date: date,
                 notes: notes,
+                completedAt: completedAt,
               ),
           createCompanionCallback:
               ({
@@ -5253,11 +7762,13 @@ class $$WorkoutSessionsTableTableManager
                 required int workoutDayId,
                 required DateTime date,
                 Value<String?> notes = const Value.absent(),
+                Value<DateTime?> completedAt = const Value.absent(),
               }) => WorkoutSessionsCompanion.insert(
                 id: id,
                 workoutDayId: workoutDayId,
                 date: date,
                 notes: notes,
+                completedAt: completedAt,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -5352,6 +7863,8 @@ typedef $$SetLogsTableCreateCompanionBuilder = SetLogsCompanion Function({
   required double weightKg,
   required int reps,
   Value<double?> rpe,
+  Value<double?> distanceKm,
+  Value<int?> durationSec,
   Value<bool> isPr,
 });
 typedef $$SetLogsTableUpdateCompanionBuilder = SetLogsCompanion Function({
@@ -5362,6 +7875,8 @@ typedef $$SetLogsTableUpdateCompanionBuilder = SetLogsCompanion Function({
   Value<double> weightKg,
   Value<int> reps,
   Value<double?> rpe,
+  Value<double?> distanceKm,
+  Value<int?> durationSec,
   Value<bool> isPr,
 });
 
@@ -5424,6 +7939,16 @@ class $$SetLogsTableFilterComposer
 
   ColumnFilters<double> get rpe => $composableBuilder(
     column: $table.rpe,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get distanceKm => $composableBuilder(
+    column: $table.distanceKm,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get durationSec => $composableBuilder(
+    column: $table.durationSec,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5495,6 +8020,16 @@ class $$SetLogsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get distanceKm => $composableBuilder(
+    column: $table.distanceKm,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get durationSec => $composableBuilder(
+    column: $table.durationSec,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isPr => $composableBuilder(
     column: $table.isPr,
     builder: (column) => ColumnOrderings(column),
@@ -5552,6 +8087,16 @@ class $$SetLogsTableAnnotationComposer
 
   GeneratedColumn<double> get rpe =>
       $composableBuilder(column: $table.rpe, builder: (column) => column);
+
+  GeneratedColumn<double> get distanceKm => $composableBuilder(
+    column: $table.distanceKm,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get durationSec => $composableBuilder(
+    column: $table.durationSec,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<bool> get isPr =>
       $composableBuilder(column: $table.isPr, builder: (column) => column);
@@ -5615,6 +8160,8 @@ class $$SetLogsTableTableManager
                 Value<double> weightKg = const Value.absent(),
                 Value<int> reps = const Value.absent(),
                 Value<double?> rpe = const Value.absent(),
+                Value<double?> distanceKm = const Value.absent(),
+                Value<int?> durationSec = const Value.absent(),
                 Value<bool> isPr = const Value.absent(),
               }) => SetLogsCompanion(
                 id: id,
@@ -5624,6 +8171,8 @@ class $$SetLogsTableTableManager
                 weightKg: weightKg,
                 reps: reps,
                 rpe: rpe,
+                distanceKm: distanceKm,
+                durationSec: durationSec,
                 isPr: isPr,
               ),
           createCompanionCallback:
@@ -5635,6 +8184,8 @@ class $$SetLogsTableTableManager
                 required double weightKg,
                 required int reps,
                 Value<double?> rpe = const Value.absent(),
+                Value<double?> distanceKm = const Value.absent(),
+                Value<int?> durationSec = const Value.absent(),
                 Value<bool> isPr = const Value.absent(),
               }) => SetLogsCompanion.insert(
                 id: id,
@@ -5644,6 +8195,8 @@ class $$SetLogsTableTableManager
                 weightKg: weightKg,
                 reps: reps,
                 rpe: rpe,
+                distanceKm: distanceKm,
+                durationSec: durationSec,
                 isPr: isPr,
               ),
           withReferenceMapper: (p0) => p0
@@ -5715,8 +8268,12 @@ typedef $$PersonalRecordsTableCreateCompanionBuilder =
     PersonalRecordsCompanion Function({
       Value<int> id,
       required String exerciseName,
+      Value<String> category,
       required double weightKg,
       required int reps,
+      Value<String?> metric,
+      Value<double?> distanceKm,
+      Value<int?> durationSec,
       required DateTime achievedAt,
       Value<String?> photoPath,
     });
@@ -5724,8 +8281,12 @@ typedef $$PersonalRecordsTableUpdateCompanionBuilder =
     PersonalRecordsCompanion Function({
       Value<int> id,
       Value<String> exerciseName,
+      Value<String> category,
       Value<double> weightKg,
       Value<int> reps,
+      Value<String?> metric,
+      Value<double?> distanceKm,
+      Value<int?> durationSec,
       Value<DateTime> achievedAt,
       Value<String?> photoPath,
     });
@@ -5749,6 +8310,11 @@ class $$PersonalRecordsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<double> get weightKg => $composableBuilder(
     column: $table.weightKg,
     builder: (column) => ColumnFilters(column),
@@ -5756,6 +8322,21 @@ class $$PersonalRecordsTableFilterComposer
 
   ColumnFilters<int> get reps => $composableBuilder(
     column: $table.reps,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get metric => $composableBuilder(
+    column: $table.metric,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get distanceKm => $composableBuilder(
+    column: $table.distanceKm,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get durationSec => $composableBuilder(
+    column: $table.durationSec,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5789,6 +8370,11 @@ class $$PersonalRecordsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<double> get weightKg => $composableBuilder(
     column: $table.weightKg,
     builder: (column) => ColumnOrderings(column),
@@ -5796,6 +8382,21 @@ class $$PersonalRecordsTableOrderingComposer
 
   ColumnOrderings<int> get reps => $composableBuilder(
     column: $table.reps,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get metric => $composableBuilder(
+    column: $table.metric,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get distanceKm => $composableBuilder(
+    column: $table.distanceKm,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get durationSec => $composableBuilder(
+    column: $table.durationSec,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -5827,11 +8428,27 @@ class $$PersonalRecordsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get category =>
+      $composableBuilder(column: $table.category, builder: (column) => column);
+
   GeneratedColumn<double> get weightKg =>
       $composableBuilder(column: $table.weightKg, builder: (column) => column);
 
   GeneratedColumn<int> get reps =>
       $composableBuilder(column: $table.reps, builder: (column) => column);
+
+  GeneratedColumn<String> get metric =>
+      $composableBuilder(column: $table.metric, builder: (column) => column);
+
+  GeneratedColumn<double> get distanceKm => $composableBuilder(
+    column: $table.distanceKm,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get durationSec => $composableBuilder(
+    column: $table.durationSec,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<DateTime> get achievedAt => $composableBuilder(
     column: $table.achievedAt,
@@ -5881,15 +8498,23 @@ class $$PersonalRecordsTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 Value<String> exerciseName = const Value.absent(),
+                Value<String> category = const Value.absent(),
                 Value<double> weightKg = const Value.absent(),
                 Value<int> reps = const Value.absent(),
+                Value<String?> metric = const Value.absent(),
+                Value<double?> distanceKm = const Value.absent(),
+                Value<int?> durationSec = const Value.absent(),
                 Value<DateTime> achievedAt = const Value.absent(),
                 Value<String?> photoPath = const Value.absent(),
               }) => PersonalRecordsCompanion(
                 id: id,
                 exerciseName: exerciseName,
+                category: category,
                 weightKg: weightKg,
                 reps: reps,
+                metric: metric,
+                distanceKm: distanceKm,
+                durationSec: durationSec,
                 achievedAt: achievedAt,
                 photoPath: photoPath,
               ),
@@ -5897,15 +8522,23 @@ class $$PersonalRecordsTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 required String exerciseName,
+                Value<String> category = const Value.absent(),
                 required double weightKg,
                 required int reps,
+                Value<String?> metric = const Value.absent(),
+                Value<double?> distanceKm = const Value.absent(),
+                Value<int?> durationSec = const Value.absent(),
                 required DateTime achievedAt,
                 Value<String?> photoPath = const Value.absent(),
               }) => PersonalRecordsCompanion.insert(
                 id: id,
                 exerciseName: exerciseName,
+                category: category,
                 weightKg: weightKg,
                 reps: reps,
+                metric: metric,
+                distanceKm: distanceKm,
+                durationSec: durationSec,
                 achievedAt: achievedAt,
                 photoPath: photoPath,
               ),
@@ -5946,18 +8579,26 @@ typedef $$PersonalRecordsTableProcessedTableManager =
 typedef $$RoutineItemsTableCreateCompanionBuilder =
     RoutineItemsCompanion Function({
       Value<int> id,
+      Value<int?> listId,
       required String label,
       required String category,
       Value<String?> defaultTime,
+      Value<int> daysMask,
+      Value<int?> hydrationGoalMl,
+      Value<int?> hydrationIntervalMin,
       Value<int> orderIndex,
       Value<bool> isActive,
     });
 typedef $$RoutineItemsTableUpdateCompanionBuilder =
     RoutineItemsCompanion Function({
       Value<int> id,
+      Value<int?> listId,
       Value<String> label,
       Value<String> category,
       Value<String?> defaultTime,
+      Value<int> daysMask,
+      Value<int?> hydrationGoalMl,
+      Value<int?> hydrationIntervalMin,
       Value<int> orderIndex,
       Value<bool> isActive,
     });
@@ -5999,6 +8640,11 @@ class $$RoutineItemsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<int> get listId => $composableBuilder(
+    column: $table.listId,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get label => $composableBuilder(
     column: $table.label,
     builder: (column) => ColumnFilters(column),
@@ -6011,6 +8657,21 @@ class $$RoutineItemsTableFilterComposer
 
   ColumnFilters<String> get defaultTime => $composableBuilder(
     column: $table.defaultTime,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get daysMask => $composableBuilder(
+    column: $table.daysMask,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get hydrationGoalMl => $composableBuilder(
+    column: $table.hydrationGoalMl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get hydrationIntervalMin => $composableBuilder(
+    column: $table.hydrationIntervalMin,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6064,6 +8725,11 @@ class $$RoutineItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get listId => $composableBuilder(
+    column: $table.listId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get label => $composableBuilder(
     column: $table.label,
     builder: (column) => ColumnOrderings(column),
@@ -6076,6 +8742,21 @@ class $$RoutineItemsTableOrderingComposer
 
   ColumnOrderings<String> get defaultTime => $composableBuilder(
     column: $table.defaultTime,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get daysMask => $composableBuilder(
+    column: $table.daysMask,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get hydrationGoalMl => $composableBuilder(
+    column: $table.hydrationGoalMl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get hydrationIntervalMin => $composableBuilder(
+    column: $table.hydrationIntervalMin,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -6102,6 +8783,9 @@ class $$RoutineItemsTableAnnotationComposer
   GeneratedColumn<int> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
+  GeneratedColumn<int> get listId =>
+      $composableBuilder(column: $table.listId, builder: (column) => column);
+
   GeneratedColumn<String> get label =>
       $composableBuilder(column: $table.label, builder: (column) => column);
 
@@ -6110,6 +8794,19 @@ class $$RoutineItemsTableAnnotationComposer
 
   GeneratedColumn<String> get defaultTime => $composableBuilder(
     column: $table.defaultTime,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get daysMask =>
+      $composableBuilder(column: $table.daysMask, builder: (column) => column);
+
+  GeneratedColumn<int> get hydrationGoalMl => $composableBuilder(
+    column: $table.hydrationGoalMl,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get hydrationIntervalMin => $composableBuilder(
+    column: $table.hydrationIntervalMin,
     builder: (column) => column,
   );
 
@@ -6176,32 +8873,48 @@ class $$RoutineItemsTableTableManager
           updateCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
+                Value<int?> listId = const Value.absent(),
                 Value<String> label = const Value.absent(),
                 Value<String> category = const Value.absent(),
                 Value<String?> defaultTime = const Value.absent(),
+                Value<int> daysMask = const Value.absent(),
+                Value<int?> hydrationGoalMl = const Value.absent(),
+                Value<int?> hydrationIntervalMin = const Value.absent(),
                 Value<int> orderIndex = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
               }) => RoutineItemsCompanion(
                 id: id,
+                listId: listId,
                 label: label,
                 category: category,
                 defaultTime: defaultTime,
+                daysMask: daysMask,
+                hydrationGoalMl: hydrationGoalMl,
+                hydrationIntervalMin: hydrationIntervalMin,
                 orderIndex: orderIndex,
                 isActive: isActive,
               ),
           createCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
+                Value<int?> listId = const Value.absent(),
                 required String label,
                 required String category,
                 Value<String?> defaultTime = const Value.absent(),
+                Value<int> daysMask = const Value.absent(),
+                Value<int?> hydrationGoalMl = const Value.absent(),
+                Value<int?> hydrationIntervalMin = const Value.absent(),
                 Value<int> orderIndex = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
               }) => RoutineItemsCompanion.insert(
                 id: id,
+                listId: listId,
                 label: label,
                 category: category,
                 defaultTime: defaultTime,
+                daysMask: daysMask,
+                hydrationGoalMl: hydrationGoalMl,
+                hydrationIntervalMin: hydrationIntervalMin,
                 orderIndex: orderIndex,
                 isActive: isActive,
               ),
@@ -6584,6 +9297,7 @@ typedef $$MealPrepTasksTableCreateCompanionBuilder =
       Value<int> id,
       required String label,
       required int weekday,
+      Value<String?> reminderTime,
       Value<bool> isActive,
     });
 typedef $$MealPrepTasksTableUpdateCompanionBuilder =
@@ -6591,6 +9305,7 @@ typedef $$MealPrepTasksTableUpdateCompanionBuilder =
       Value<int> id,
       Value<String> label,
       Value<int> weekday,
+      Value<String?> reminderTime,
       Value<bool> isActive,
     });
 
@@ -6642,6 +9357,11 @@ class $$MealPrepTasksTableFilterComposer
 
   ColumnFilters<int> get weekday => $composableBuilder(
     column: $table.weekday,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get reminderTime => $composableBuilder(
+    column: $table.reminderTime,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6700,6 +9420,11 @@ class $$MealPrepTasksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get reminderTime => $composableBuilder(
+    column: $table.reminderTime,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isActive => $composableBuilder(
     column: $table.isActive,
     builder: (column) => ColumnOrderings(column),
@@ -6723,6 +9448,11 @@ class $$MealPrepTasksTableAnnotationComposer
 
   GeneratedColumn<int> get weekday =>
       $composableBuilder(column: $table.weekday, builder: (column) => column);
+
+  GeneratedColumn<String> get reminderTime => $composableBuilder(
+    column: $table.reminderTime,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<bool> get isActive =>
       $composableBuilder(column: $table.isActive, builder: (column) => column);
@@ -6784,11 +9514,13 @@ class $$MealPrepTasksTableTableManager
                 Value<int> id = const Value.absent(),
                 Value<String> label = const Value.absent(),
                 Value<int> weekday = const Value.absent(),
+                Value<String?> reminderTime = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
               }) => MealPrepTasksCompanion(
                 id: id,
                 label: label,
                 weekday: weekday,
+                reminderTime: reminderTime,
                 isActive: isActive,
               ),
           createCompanionCallback:
@@ -6796,11 +9528,13 @@ class $$MealPrepTasksTableTableManager
                 Value<int> id = const Value.absent(),
                 required String label,
                 required int weekday,
+                Value<String?> reminderTime = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
               }) => MealPrepTasksCompanion.insert(
                 id: id,
                 label: label,
                 weekday: weekday,
+                reminderTime: reminderTime,
                 isActive: isActive,
               ),
           withReferenceMapper: (p0) => p0
@@ -7365,6 +10099,11 @@ typedef $$AppSettingsTableCreateCompanionBuilder =
       Value<String> weightUnit,
       Value<String> themeMode,
       Value<bool> hasSeenTour,
+      Value<bool> hydrationEnabled,
+      Value<int> hydrationGoalMl,
+      Value<int> hydrationIntervalMin,
+      Value<String> hydrationStart,
+      Value<String> hydrationEnd,
     });
 typedef $$AppSettingsTableUpdateCompanionBuilder =
     AppSettingsCompanion Function({
@@ -7376,6 +10115,11 @@ typedef $$AppSettingsTableUpdateCompanionBuilder =
       Value<String> weightUnit,
       Value<String> themeMode,
       Value<bool> hasSeenTour,
+      Value<bool> hydrationEnabled,
+      Value<int> hydrationGoalMl,
+      Value<int> hydrationIntervalMin,
+      Value<String> hydrationStart,
+      Value<String> hydrationEnd,
     });
 
 class $$AppSettingsTableFilterComposer
@@ -7424,6 +10168,31 @@ class $$AppSettingsTableFilterComposer
 
   ColumnFilters<bool> get hasSeenTour => $composableBuilder(
     column: $table.hasSeenTour,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get hydrationEnabled => $composableBuilder(
+    column: $table.hydrationEnabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get hydrationGoalMl => $composableBuilder(
+    column: $table.hydrationGoalMl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get hydrationIntervalMin => $composableBuilder(
+    column: $table.hydrationIntervalMin,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get hydrationStart => $composableBuilder(
+    column: $table.hydrationStart,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get hydrationEnd => $composableBuilder(
+    column: $table.hydrationEnd,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -7476,6 +10245,31 @@ class $$AppSettingsTableOrderingComposer
     column: $table.hasSeenTour,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get hydrationEnabled => $composableBuilder(
+    column: $table.hydrationEnabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get hydrationGoalMl => $composableBuilder(
+    column: $table.hydrationGoalMl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get hydrationIntervalMin => $composableBuilder(
+    column: $table.hydrationIntervalMin,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get hydrationStart => $composableBuilder(
+    column: $table.hydrationStart,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get hydrationEnd => $composableBuilder(
+    column: $table.hydrationEnd,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$AppSettingsTableAnnotationComposer
@@ -7522,6 +10316,31 @@ class $$AppSettingsTableAnnotationComposer
     column: $table.hasSeenTour,
     builder: (column) => column,
   );
+
+  GeneratedColumn<bool> get hydrationEnabled => $composableBuilder(
+    column: $table.hydrationEnabled,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get hydrationGoalMl => $composableBuilder(
+    column: $table.hydrationGoalMl,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get hydrationIntervalMin => $composableBuilder(
+    column: $table.hydrationIntervalMin,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get hydrationStart => $composableBuilder(
+    column: $table.hydrationStart,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get hydrationEnd => $composableBuilder(
+    column: $table.hydrationEnd,
+    builder: (column) => column,
+  );
 }
 
 class $$AppSettingsTableTableManager
@@ -7563,6 +10382,11 @@ class $$AppSettingsTableTableManager
                 Value<String> weightUnit = const Value.absent(),
                 Value<String> themeMode = const Value.absent(),
                 Value<bool> hasSeenTour = const Value.absent(),
+                Value<bool> hydrationEnabled = const Value.absent(),
+                Value<int> hydrationGoalMl = const Value.absent(),
+                Value<int> hydrationIntervalMin = const Value.absent(),
+                Value<String> hydrationStart = const Value.absent(),
+                Value<String> hydrationEnd = const Value.absent(),
               }) => AppSettingsCompanion(
                 id: id,
                 notifyDayBefore: notifyDayBefore,
@@ -7572,6 +10396,11 @@ class $$AppSettingsTableTableManager
                 weightUnit: weightUnit,
                 themeMode: themeMode,
                 hasSeenTour: hasSeenTour,
+                hydrationEnabled: hydrationEnabled,
+                hydrationGoalMl: hydrationGoalMl,
+                hydrationIntervalMin: hydrationIntervalMin,
+                hydrationStart: hydrationStart,
+                hydrationEnd: hydrationEnd,
               ),
           createCompanionCallback:
               ({
@@ -7583,6 +10412,11 @@ class $$AppSettingsTableTableManager
                 Value<String> weightUnit = const Value.absent(),
                 Value<String> themeMode = const Value.absent(),
                 Value<bool> hasSeenTour = const Value.absent(),
+                Value<bool> hydrationEnabled = const Value.absent(),
+                Value<int> hydrationGoalMl = const Value.absent(),
+                Value<int> hydrationIntervalMin = const Value.absent(),
+                Value<String> hydrationStart = const Value.absent(),
+                Value<String> hydrationEnd = const Value.absent(),
               }) => AppSettingsCompanion.insert(
                 id: id,
                 notifyDayBefore: notifyDayBefore,
@@ -7592,6 +10426,11 @@ class $$AppSettingsTableTableManager
                 weightUnit: weightUnit,
                 themeMode: themeMode,
                 hasSeenTour: hasSeenTour,
+                hydrationEnabled: hydrationEnabled,
+                hydrationGoalMl: hydrationGoalMl,
+                hydrationIntervalMin: hydrationIntervalMin,
+                hydrationStart: hydrationStart,
+                hydrationEnd: hydrationEnd,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -7627,6 +10466,773 @@ typedef $$AppSettingsTableProcessedTableManager =
       AppSetting,
       PrefetchHooks Function()
     >;
+typedef $$CategoriesTableCreateCompanionBuilder = CategoriesCompanion Function({
+  Value<int> id,
+  required String name,
+  Value<int> orderIndex,
+});
+typedef $$CategoriesTableUpdateCompanionBuilder = CategoriesCompanion Function({
+  Value<int> id,
+  Value<String> name,
+  Value<int> orderIndex,
+});
+
+class $$CategoriesTableFilterComposer
+    extends Composer<_$AppDatabase, $CategoriesTable> {
+  $$CategoriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get orderIndex => $composableBuilder(
+    column: $table.orderIndex,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CategoriesTableOrderingComposer
+    extends Composer<_$AppDatabase, $CategoriesTable> {
+  $$CategoriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get orderIndex => $composableBuilder(
+    column: $table.orderIndex,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CategoriesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CategoriesTable> {
+  $$CategoriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<int> get orderIndex => $composableBuilder(
+    column: $table.orderIndex,
+    builder: (column) => column,
+  );
+}
+
+class $$CategoriesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CategoriesTable,
+          Category,
+          $$CategoriesTableFilterComposer,
+          $$CategoriesTableOrderingComposer,
+          $$CategoriesTableAnnotationComposer,
+          $$CategoriesTableCreateCompanionBuilder,
+          $$CategoriesTableUpdateCompanionBuilder,
+          (Category, BaseReferences<_$AppDatabase, $CategoriesTable, Category>),
+          Category,
+          PrefetchHooks Function()
+        > {
+  $$CategoriesTableTableManager(_$AppDatabase db, $CategoriesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CategoriesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CategoriesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CategoriesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<String> name = const Value.absent(),
+            Value<int> orderIndex = const Value.absent(),
+          }) => CategoriesCompanion(id: id, name: name, orderIndex: orderIndex),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String name,
+                Value<int> orderIndex = const Value.absent(),
+              }) => CategoriesCompanion.insert(
+                id: id,
+                name: name,
+                orderIndex: orderIndex,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$CategoriesTable, Category>(table),
+                  BaseReferences<_$AppDatabase, $CategoriesTable, Category>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CategoriesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CategoriesTable,
+      Category,
+      $$CategoriesTableFilterComposer,
+      $$CategoriesTableOrderingComposer,
+      $$CategoriesTableAnnotationComposer,
+      $$CategoriesTableCreateCompanionBuilder,
+      $$CategoriesTableUpdateCompanionBuilder,
+      (Category, BaseReferences<_$AppDatabase, $CategoriesTable, Category>),
+      Category,
+      PrefetchHooks Function()
+    >;
+typedef $$ShoppingItemsTableCreateCompanionBuilder =
+    ShoppingItemsCompanion Function({
+      Value<int> id,
+      Value<int?> listId,
+      required String label,
+      Value<int> orderIndex,
+      Value<bool> isBought,
+    });
+typedef $$ShoppingItemsTableUpdateCompanionBuilder =
+    ShoppingItemsCompanion Function({
+      Value<int> id,
+      Value<int?> listId,
+      Value<String> label,
+      Value<int> orderIndex,
+      Value<bool> isBought,
+    });
+
+class $$ShoppingItemsTableFilterComposer
+    extends Composer<_$AppDatabase, $ShoppingItemsTable> {
+  $$ShoppingItemsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get listId => $composableBuilder(
+    column: $table.listId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get orderIndex => $composableBuilder(
+    column: $table.orderIndex,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isBought => $composableBuilder(
+    column: $table.isBought,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$ShoppingItemsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ShoppingItemsTable> {
+  $$ShoppingItemsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get listId => $composableBuilder(
+    column: $table.listId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get orderIndex => $composableBuilder(
+    column: $table.orderIndex,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isBought => $composableBuilder(
+    column: $table.isBought,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ShoppingItemsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ShoppingItemsTable> {
+  $$ShoppingItemsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get listId =>
+      $composableBuilder(column: $table.listId, builder: (column) => column);
+
+  GeneratedColumn<String> get label =>
+      $composableBuilder(column: $table.label, builder: (column) => column);
+
+  GeneratedColumn<int> get orderIndex => $composableBuilder(
+    column: $table.orderIndex,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isBought =>
+      $composableBuilder(column: $table.isBought, builder: (column) => column);
+}
+
+class $$ShoppingItemsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ShoppingItemsTable,
+          ShoppingItem,
+          $$ShoppingItemsTableFilterComposer,
+          $$ShoppingItemsTableOrderingComposer,
+          $$ShoppingItemsTableAnnotationComposer,
+          $$ShoppingItemsTableCreateCompanionBuilder,
+          $$ShoppingItemsTableUpdateCompanionBuilder,
+          (
+            ShoppingItem,
+            BaseReferences<_$AppDatabase, $ShoppingItemsTable, ShoppingItem>,
+          ),
+          ShoppingItem,
+          PrefetchHooks Function()
+        > {
+  $$ShoppingItemsTableTableManager(_$AppDatabase db, $ShoppingItemsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ShoppingItemsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ShoppingItemsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ShoppingItemsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int?> listId = const Value.absent(),
+                Value<String> label = const Value.absent(),
+                Value<int> orderIndex = const Value.absent(),
+                Value<bool> isBought = const Value.absent(),
+              }) => ShoppingItemsCompanion(
+                id: id,
+                listId: listId,
+                label: label,
+                orderIndex: orderIndex,
+                isBought: isBought,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int?> listId = const Value.absent(),
+                required String label,
+                Value<int> orderIndex = const Value.absent(),
+                Value<bool> isBought = const Value.absent(),
+              }) => ShoppingItemsCompanion.insert(
+                id: id,
+                listId: listId,
+                label: label,
+                orderIndex: orderIndex,
+                isBought: isBought,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$ShoppingItemsTable, ShoppingItem>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $ShoppingItemsTable,
+                    ShoppingItem
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ShoppingItemsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ShoppingItemsTable,
+      ShoppingItem,
+      $$ShoppingItemsTableFilterComposer,
+      $$ShoppingItemsTableOrderingComposer,
+      $$ShoppingItemsTableAnnotationComposer,
+      $$ShoppingItemsTableCreateCompanionBuilder,
+      $$ShoppingItemsTableUpdateCompanionBuilder,
+      (
+        ShoppingItem,
+        BaseReferences<_$AppDatabase, $ShoppingItemsTable, ShoppingItem>,
+      ),
+      ShoppingItem,
+      PrefetchHooks Function()
+    >;
+typedef $$RoutineListsTableCreateCompanionBuilder =
+    RoutineListsCompanion Function({
+      Value<int> id,
+      required String name,
+      Value<String> kind,
+      Value<int> orderIndex,
+      Value<bool> isActive,
+    });
+typedef $$RoutineListsTableUpdateCompanionBuilder =
+    RoutineListsCompanion Function({
+      Value<int> id,
+      Value<String> name,
+      Value<String> kind,
+      Value<int> orderIndex,
+      Value<bool> isActive,
+    });
+
+class $$RoutineListsTableFilterComposer
+    extends Composer<_$AppDatabase, $RoutineListsTable> {
+  $$RoutineListsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get orderIndex => $composableBuilder(
+    column: $table.orderIndex,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$RoutineListsTableOrderingComposer
+    extends Composer<_$AppDatabase, $RoutineListsTable> {
+  $$RoutineListsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get orderIndex => $composableBuilder(
+    column: $table.orderIndex,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$RoutineListsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $RoutineListsTable> {
+  $$RoutineListsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<int> get orderIndex => $composableBuilder(
+    column: $table.orderIndex,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isActive =>
+      $composableBuilder(column: $table.isActive, builder: (column) => column);
+}
+
+class $$RoutineListsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $RoutineListsTable,
+          RoutineList,
+          $$RoutineListsTableFilterComposer,
+          $$RoutineListsTableOrderingComposer,
+          $$RoutineListsTableAnnotationComposer,
+          $$RoutineListsTableCreateCompanionBuilder,
+          $$RoutineListsTableUpdateCompanionBuilder,
+          (
+            RoutineList,
+            BaseReferences<_$AppDatabase, $RoutineListsTable, RoutineList>,
+          ),
+          RoutineList,
+          PrefetchHooks Function()
+        > {
+  $$RoutineListsTableTableManager(_$AppDatabase db, $RoutineListsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$RoutineListsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$RoutineListsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$RoutineListsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String> kind = const Value.absent(),
+                Value<int> orderIndex = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+              }) => RoutineListsCompanion(
+                id: id,
+                name: name,
+                kind: kind,
+                orderIndex: orderIndex,
+                isActive: isActive,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String name,
+                Value<String> kind = const Value.absent(),
+                Value<int> orderIndex = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+              }) => RoutineListsCompanion.insert(
+                id: id,
+                name: name,
+                kind: kind,
+                orderIndex: orderIndex,
+                isActive: isActive,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$RoutineListsTable, RoutineList>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $RoutineListsTable,
+                    RoutineList
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$RoutineListsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $RoutineListsTable,
+      RoutineList,
+      $$RoutineListsTableFilterComposer,
+      $$RoutineListsTableOrderingComposer,
+      $$RoutineListsTableAnnotationComposer,
+      $$RoutineListsTableCreateCompanionBuilder,
+      $$RoutineListsTableUpdateCompanionBuilder,
+      (
+        RoutineList,
+        BaseReferences<_$AppDatabase, $RoutineListsTable, RoutineList>,
+      ),
+      RoutineList,
+      PrefetchHooks Function()
+    >;
+typedef $$HydrationLogsTableCreateCompanionBuilder =
+    HydrationLogsCompanion Function({
+      Value<int> id,
+      Value<int?> itemId,
+      required DateTime date,
+      required int amountMl,
+      required DateTime loggedAt,
+    });
+typedef $$HydrationLogsTableUpdateCompanionBuilder =
+    HydrationLogsCompanion Function({
+      Value<int> id,
+      Value<int?> itemId,
+      Value<DateTime> date,
+      Value<int> amountMl,
+      Value<DateTime> loggedAt,
+    });
+
+class $$HydrationLogsTableFilterComposer
+    extends Composer<_$AppDatabase, $HydrationLogsTable> {
+  $$HydrationLogsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get itemId => $composableBuilder(
+    column: $table.itemId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get date => $composableBuilder(
+    column: $table.date,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get amountMl => $composableBuilder(
+    column: $table.amountMl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get loggedAt => $composableBuilder(
+    column: $table.loggedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$HydrationLogsTableOrderingComposer
+    extends Composer<_$AppDatabase, $HydrationLogsTable> {
+  $$HydrationLogsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get itemId => $composableBuilder(
+    column: $table.itemId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get date => $composableBuilder(
+    column: $table.date,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get amountMl => $composableBuilder(
+    column: $table.amountMl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get loggedAt => $composableBuilder(
+    column: $table.loggedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$HydrationLogsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $HydrationLogsTable> {
+  $$HydrationLogsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get itemId =>
+      $composableBuilder(column: $table.itemId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get date =>
+      $composableBuilder(column: $table.date, builder: (column) => column);
+
+  GeneratedColumn<int> get amountMl =>
+      $composableBuilder(column: $table.amountMl, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get loggedAt =>
+      $composableBuilder(column: $table.loggedAt, builder: (column) => column);
+}
+
+class $$HydrationLogsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $HydrationLogsTable,
+          HydrationLog,
+          $$HydrationLogsTableFilterComposer,
+          $$HydrationLogsTableOrderingComposer,
+          $$HydrationLogsTableAnnotationComposer,
+          $$HydrationLogsTableCreateCompanionBuilder,
+          $$HydrationLogsTableUpdateCompanionBuilder,
+          (
+            HydrationLog,
+            BaseReferences<_$AppDatabase, $HydrationLogsTable, HydrationLog>,
+          ),
+          HydrationLog,
+          PrefetchHooks Function()
+        > {
+  $$HydrationLogsTableTableManager(_$AppDatabase db, $HydrationLogsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$HydrationLogsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$HydrationLogsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$HydrationLogsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int?> itemId = const Value.absent(),
+                Value<DateTime> date = const Value.absent(),
+                Value<int> amountMl = const Value.absent(),
+                Value<DateTime> loggedAt = const Value.absent(),
+              }) => HydrationLogsCompanion(
+                id: id,
+                itemId: itemId,
+                date: date,
+                amountMl: amountMl,
+                loggedAt: loggedAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int?> itemId = const Value.absent(),
+                required DateTime date,
+                required int amountMl,
+                required DateTime loggedAt,
+              }) => HydrationLogsCompanion.insert(
+                id: id,
+                itemId: itemId,
+                date: date,
+                amountMl: amountMl,
+                loggedAt: loggedAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$HydrationLogsTable, HydrationLog>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $HydrationLogsTable,
+                    HydrationLog
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$HydrationLogsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $HydrationLogsTable,
+      HydrationLog,
+      $$HydrationLogsTableFilterComposer,
+      $$HydrationLogsTableOrderingComposer,
+      $$HydrationLogsTableAnnotationComposer,
+      $$HydrationLogsTableCreateCompanionBuilder,
+      $$HydrationLogsTableUpdateCompanionBuilder,
+      (
+        HydrationLog,
+        BaseReferences<_$AppDatabase, $HydrationLogsTable, HydrationLog>,
+      ),
+      HydrationLog,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -7653,4 +11259,12 @@ class $AppDatabaseManager {
       $$BodyLogsTableTableManager(_db, _db.bodyLogs);
   $$AppSettingsTableTableManager get appSettings =>
       $$AppSettingsTableTableManager(_db, _db.appSettings);
+  $$CategoriesTableTableManager get categories =>
+      $$CategoriesTableTableManager(_db, _db.categories);
+  $$ShoppingItemsTableTableManager get shoppingItems =>
+      $$ShoppingItemsTableTableManager(_db, _db.shoppingItems);
+  $$RoutineListsTableTableManager get routineLists =>
+      $$RoutineListsTableTableManager(_db, _db.routineLists);
+  $$HydrationLogsTableTableManager get hydrationLogs =>
+      $$HydrationLogsTableTableManager(_db, _db.hydrationLogs);
 }

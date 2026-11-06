@@ -7,10 +7,12 @@ import 'package:intl/intl.dart';
 import '../../data/database.dart';
 import '../../data/workout_dao.dart';
 import '../../providers/workout_providers.dart';
+import '../../utils/cardio.dart';
 
 /// Session logger (F2) + PR detection & celebration (F3): log sets per planned
 /// exercise, with last session's numbers / current PR shown inline. Beating a
-/// record fires confetti, a haptic, and a "🎉 NEW PR" card.
+/// record fires confetti, a haptic, and a "🎉 NEW PR" card. Cardio exercises
+/// log distance / duration / count instead of weight × reps.
 class SessionLoggerScreen extends ConsumerStatefulWidget {
   const SessionLoggerScreen({
     super.key,
@@ -52,6 +54,66 @@ class _SessionLoggerScreenState extends ConsumerState<SessionLoggerScreen> {
     );
   }
 
+  void _showRpeInfo() {
+    showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('What is RPE?'),
+        content: const Text(
+          'RPE = Rate of Perceived Exertion, a 1–10 scale of how hard a set '
+          'felt.\n\n'
+          '• 10 — no reps left (failure)\n'
+          '• 9 — ~1 rep left\n'
+          '• 8 — ~2 reps left\n'
+          '• ≤6 — easy / warm-up\n\n'
+          "It's optional. Logging it shows whether a weight is getting easier "
+          '(time to add load) or harder (hold steady) even when the numbers '
+          'look the same.',
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _finish() async {
+    final dao = ref.read(workoutDaoProvider);
+    final logs = await dao.getSetLogsForSession(widget.sessionId);
+    await dao.finishSession(widget.sessionId);
+    if (!mounted) return;
+    final prCount = logs.where((l) => l.isPr).length;
+    final exercises = logs.map((l) => l.exerciseName).toSet().length;
+    await showDialog<void>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        title: const Text('Workout complete 💪'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${logs.length} ${logs.length == 1 ? 'set' : 'sets'} · '
+                '$exercises ${exercises == 1 ? 'exercise' : 'exercises'}'),
+            if (prCount > 0) ...[
+              const SizedBox(height: 8),
+              Text('🎉 $prCount new ${prCount == 1 ? 'PR' : 'PRs'} today'),
+            ],
+          ],
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(dctx),
+            child: const Text('Done'),
+          ),
+        ],
+      ),
+    );
+    if (mounted) Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     final exAsync = ref.watch(exercisesProvider(widget.dayId));
@@ -59,7 +121,15 @@ class _SessionLoggerScreenState extends ConsumerState<SessionLoggerScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.dayTitle.isEmpty ? "Today's workout" : widget.dayTitle),
+        title:
+            Text(widget.dayTitle.isEmpty ? "Today's workout" : widget.dayTitle),
+        actions: [
+          IconButton(
+            tooltip: 'What is RPE?',
+            icon: const Icon(Icons.help_outline),
+            onPressed: _showRpeInfo,
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(24),
           child: Padding(
@@ -110,6 +180,24 @@ class _SessionLoggerScreenState extends ConsumerState<SessionLoggerScreen> {
           ),
         ],
       ),
+      bottomNavigationBar: exAsync.maybeWhen(
+        orElse: () => null,
+        data: (exercises) => exercises.isEmpty
+            ? null
+            : SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(50),
+                    ),
+                    icon: const Icon(Icons.check_circle_outline),
+                    label: const Text('Finish workout'),
+                    onPressed: _finish,
+                  ),
+                ),
+              ),
+      ),
     );
   }
 }
@@ -133,45 +221,111 @@ class _ExerciseLogCardState extends ConsumerState<_ExerciseLogCard> {
   final _weightCtrl = TextEditingController();
   final _repsCtrl = TextEditingController();
   final _rpeCtrl = TextEditingController();
+  final _distanceCtrl = TextEditingController();
+  final _timeCtrl = TextEditingController(); // minutes
+  final _countCtrl = TextEditingController();
+
+  String? get _metric => widget.exercise.cardioMetric;
+
+  @override
+  void initState() {
+    super.initState();
+    // Prefill with the planned target weight for quick logging (strength only).
+    final target = widget.exercise.targetWeightKg;
+    if (_metric == null && target != null) {
+      _weightCtrl.text = target == target.roundToDouble()
+          ? target.toStringAsFixed(0)
+          : '$target';
+    }
+  }
 
   @override
   void dispose() {
     _weightCtrl.dispose();
     _repsCtrl.dispose();
     _rpeCtrl.dispose();
+    _distanceCtrl.dispose();
+    _timeCtrl.dispose();
+    _countCtrl.dispose();
     super.dispose();
   }
 
   ExerciseInSession get _key =>
       (sessionId: widget.sessionId, exerciseName: widget.exercise.name);
 
+  void _snack(String msg) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(msg)));
+  }
+
   Future<void> _addSet() async {
-    final weight = double.tryParse(_weightCtrl.text.trim());
-    final reps = int.tryParse(_repsCtrl.text.trim());
+    final metric = _metric;
     final rpe = _rpeCtrl.text.trim().isEmpty
         ? null
         : double.tryParse(_rpeCtrl.text.trim());
-    if (weight == null || reps == null || reps <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a weight and reps.')),
-      );
-      return;
+
+    double weight = 0;
+    int reps = 0;
+    double? distanceKm;
+    int? durationSec;
+
+    if (metric == null) {
+      final w = double.tryParse(_weightCtrl.text.trim());
+      final r = int.tryParse(_repsCtrl.text.trim());
+      if (w == null || r == null || r <= 0) {
+        _snack('Enter a weight and reps.');
+        return;
+      }
+      weight = w;
+      reps = r;
+    } else if (metric == 'distance') {
+      final d = double.tryParse(_distanceCtrl.text.trim());
+      if (d == null || d <= 0) {
+        _snack('Enter a distance in km.');
+        return;
+      }
+      distanceKm = d;
+      final mins = double.tryParse(_timeCtrl.text.trim());
+      if (mins != null && mins > 0) durationSec = (mins * 60).round();
+    } else if (metric == 'duration') {
+      final mins = double.tryParse(_timeCtrl.text.trim());
+      if (mins == null || mins <= 0) {
+        _snack('Enter a duration in minutes.');
+        return;
+      }
+      durationSec = (mins * 60).round();
+    } else if (metric == 'count') {
+      final c = int.tryParse(_countCtrl.text.trim());
+      if (c == null || c <= 0) {
+        _snack('Enter a count.');
+        return;
+      }
+      reps = c;
     }
+
     final pr = await ref.read(workoutDaoProvider).addSetLog(
           sessionId: widget.sessionId,
           exerciseName: widget.exercise.name,
           weightKg: weight,
           reps: reps,
           rpe: rpe,
+          category: widget.exercise.category,
+          metric: metric,
+          distanceKm: distanceKm,
+          durationSec: durationSec,
+          trackPr: widget.exercise.trackPr,
         );
     if (pr != null) {
       widget.onPr(pr);
     } else {
       HapticFeedback.lightImpact();
     }
+    // Clear the per-rep inputs; keep weight for convenient repeat sets.
     _repsCtrl.clear();
     _rpeCtrl.clear();
-    // Keep the weight for convenient repeat sets.
+    _distanceCtrl.clear();
+    _timeCtrl.clear();
+    _countCtrl.clear();
   }
 
   @override
@@ -209,6 +363,7 @@ class _ExerciseLogCardState extends ConsumerState<_ExerciseLogCard> {
             _TargetBanner(
               sessionId: widget.sessionId,
               exerciseName: widget.exercise.name,
+              metric: _metric,
             ),
             const SizedBox(height: 12),
             setsAsync.when(
@@ -222,6 +377,7 @@ class _ExerciseLogCardState extends ConsumerState<_ExerciseLogCard> {
                   for (final s in sets)
                     _LoggedSetRow(
                       set: s,
+                      metric: _metric,
                       onDelete: () =>
                           ref.read(workoutDaoProvider).deleteSetLog(s.id),
                     ),
@@ -229,14 +385,68 @@ class _ExerciseLogCardState extends ConsumerState<_ExerciseLogCard> {
               ),
             ),
             const SizedBox(height: 8),
-            _SetInputRow(
-              weightCtrl: _weightCtrl,
-              repsCtrl: _repsCtrl,
-              rpeCtrl: _rpeCtrl,
-              onAdd: _addSet,
-            ),
+            _buildInputRow(),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildInputRow() {
+    final metric = _metric;
+    final List<Widget> fields;
+    if (metric == null) {
+      fields = [
+        Expanded(flex: 3, child: _numField(_weightCtrl, 'kg', decimal: true)),
+        const SizedBox(width: 8),
+        Expanded(flex: 2, child: _numField(_repsCtrl, 'reps')),
+        const SizedBox(width: 8),
+        Expanded(flex: 2, child: _numField(_rpeCtrl, 'RPE', decimal: true)),
+      ];
+    } else if (metric == 'distance') {
+      fields = [
+        Expanded(flex: 3, child: _numField(_distanceCtrl, 'km', decimal: true)),
+        const SizedBox(width: 8),
+        Expanded(flex: 3, child: _numField(_timeCtrl, 'min', decimal: true)),
+        const SizedBox(width: 8),
+        Expanded(flex: 2, child: _numField(_rpeCtrl, 'RPE', decimal: true)),
+      ];
+    } else if (metric == 'duration') {
+      fields = [
+        Expanded(flex: 3, child: _numField(_timeCtrl, 'minutes', decimal: true)),
+        const SizedBox(width: 8),
+        Expanded(flex: 2, child: _numField(_rpeCtrl, 'RPE', decimal: true)),
+      ];
+    } else {
+      // count
+      fields = [
+        Expanded(flex: 3, child: _numField(_countCtrl, 'count')),
+        const SizedBox(width: 8),
+        Expanded(flex: 2, child: _numField(_rpeCtrl, 'RPE', decimal: true)),
+      ];
+    }
+    return Row(
+      children: [
+        ...fields,
+        const SizedBox(width: 4),
+        IconButton.filled(
+          icon: const Icon(Icons.add),
+          onPressed: _addSet,
+          tooltip: 'Add set',
+        ),
+      ],
+    );
+  }
+
+  Widget _numField(TextEditingController c, String label,
+      {bool decimal = false}) {
+    return TextField(
+      controller: c,
+      keyboardType: TextInputType.numberWithOptions(decimal: decimal),
+      decoration: InputDecoration(
+        labelText: label,
+        isDense: true,
+        border: const OutlineInputBorder(),
       ),
     );
   }
@@ -245,25 +455,43 @@ class _ExerciseLogCardState extends ConsumerState<_ExerciseLogCard> {
 /// Shows the current PR to beat (F3) or last session's best; falls back to an
 /// encouraging prompt when there's no history yet.
 class _TargetBanner extends ConsumerWidget {
-  const _TargetBanner({required this.sessionId, required this.exerciseName});
+  const _TargetBanner({
+    required this.sessionId,
+    required this.exerciseName,
+    required this.metric,
+  });
 
   final int sessionId;
   final String exerciseName;
+  final String? metric;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
     final pr = ref.watch(exercisePrProvider(exerciseName)).value;
-    final prev = ref
-        .watch(beatThisTargetProvider(
-            (sessionId: sessionId, exerciseName: exerciseName)))
-        .value;
 
     final String text;
-    if (pr != null) {
-      text = '🎯 PR to beat: ${_fmt(pr.weightKg)} kg × ${pr.reps}';
-    } else if (prev != null) {
-      text = '🎯 Beat this: ${_fmt(prev.weightKg)} kg × ${prev.reps}';
+    if (pr != null && pr.metric == metric) {
+      if (metric == null) {
+        text = '🎯 PR to beat: ${_fmt(pr.weightKg)} kg × ${pr.reps}';
+      } else {
+        text = '🎯 PR to beat: ${cardioSummary(
+          metric!,
+          distanceKm: pr.distanceKm,
+          durationSec: pr.durationSec,
+          count: pr.reps,
+        )}';
+      }
+    } else if (metric == null) {
+      final prev = ref
+          .watch(beatThisTargetProvider(
+              (sessionId: sessionId, exerciseName: exerciseName)))
+          .value;
+      if (prev != null) {
+        text = '🎯 Beat this: ${_fmt(prev.weightKg)} kg × ${prev.reps}';
+      } else {
+        text = 'No previous data — set the bar! 💪';
+      }
     } else {
       text = 'No previous data — set the bar! 💪';
     }
@@ -287,14 +515,27 @@ class _TargetBanner extends ConsumerWidget {
 }
 
 class _LoggedSetRow extends StatelessWidget {
-  const _LoggedSetRow({required this.set, required this.onDelete});
+  const _LoggedSetRow({
+    required this.set,
+    required this.metric,
+    required this.onDelete,
+  });
 
   final SetLog set;
+  final String? metric;
   final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final label = metric == null
+        ? '${_fmt(set.weightKg)} kg × ${set.reps}'
+        : cardioSummary(
+            metric!,
+            distanceKm: set.distanceKm,
+            durationSec: set.durationSec,
+            count: set.reps,
+          );
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
@@ -304,7 +545,9 @@ class _LoggedSetRow extends StatelessWidget {
             height: 26,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: set.isPr ? scheme.tertiaryContainer : scheme.surfaceContainerHighest,
+              color: set.isPr
+                  ? scheme.tertiaryContainer
+                  : scheme.surfaceContainerHighest,
               shape: BoxShape.circle,
             ),
             child: Text(
@@ -314,7 +557,7 @@ class _LoggedSetRow extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Text(
-            '${_fmt(set.weightKg)} kg × ${set.reps}',
+            label,
             style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
           ),
           if (set.rpe != null) ...[
@@ -340,57 +583,21 @@ class _LoggedSetRow extends StatelessWidget {
   }
 }
 
-class _SetInputRow extends StatelessWidget {
-  const _SetInputRow({
-    required this.weightCtrl,
-    required this.repsCtrl,
-    required this.rpeCtrl,
-    required this.onAdd,
-  });
-
-  final TextEditingController weightCtrl;
-  final TextEditingController repsCtrl;
-  final TextEditingController rpeCtrl;
-  final VoidCallback onAdd;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(flex: 3, child: _numField(weightCtrl, 'kg', decimal: true)),
-        const SizedBox(width: 8),
-        Expanded(flex: 2, child: _numField(repsCtrl, 'reps')),
-        const SizedBox(width: 8),
-        Expanded(flex: 2, child: _numField(rpeCtrl, 'RPE', decimal: true)),
-        const SizedBox(width: 4),
-        IconButton.filled(
-          icon: const Icon(Icons.add),
-          onPressed: onAdd,
-          tooltip: 'Add set',
-        ),
-      ],
-    );
-  }
-
-  Widget _numField(TextEditingController c, String label,
-      {bool decimal = false}) {
-    return TextField(
-      controller: c,
-      keyboardType: TextInputType.numberWithOptions(decimal: decimal),
-      decoration: InputDecoration(
-        labelText: label,
-        isDense: true,
-        border: const OutlineInputBorder(),
-      ),
-    );
-  }
-}
-
 class _PrCelebrationCard extends StatelessWidget {
   const _PrCelebrationCard({required this.exerciseName, required this.pr});
 
   final String exerciseName;
   final PrResult pr;
+
+  String _valueFor(double weightKg, int reps) {
+    if (pr.metric == null) return '${_fmt(weightKg)} × $reps';
+    return cardioSummary(
+      pr.metric!,
+      distanceKm: pr.distanceKm,
+      durationSec: pr.durationSec,
+      count: reps,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -426,17 +633,25 @@ class _PrCelebrationCard extends StatelessWidget {
                 if (prev != null) ...[
                   _StatBlock(
                     label: 'Old',
-                    value: '${_fmt(prev.weightKg)} × ${prev.reps}',
+                    value: pr.metric == null
+                        ? '${_fmt(prev.weightKg)} × ${prev.reps}'
+                        : cardioSummary(
+                            pr.metric!,
+                            distanceKm: prev.distanceKm,
+                            durationSec: prev.durationSec,
+                            count: prev.reps,
+                          ),
                     emphasized: false,
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Icon(Icons.arrow_forward, color: scheme.onSurfaceVariant),
+                    child: Icon(Icons.arrow_forward,
+                        color: scheme.onSurfaceVariant),
                   ),
                 ],
                 _StatBlock(
                   label: 'New',
-                  value: '${_fmt(pr.weightKg)} × ${pr.reps}',
+                  value: _valueFor(pr.weightKg, pr.reps),
                   emphasized: true,
                 ),
               ],

@@ -48,6 +48,8 @@ dependencies:
   fl_chart: ^1.2.0
   intl: ^0.20.3
   flutter_timezone: ^5.1.1
+  archive: ^4.0.2
+  file_picker: ^13.2.0
 
 dev_dependencies:
   flutter_test:
@@ -61,6 +63,7 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   drift_dev: ^2.35.1
   build_runner: ^2.16.1
+  sqlite3: ^3.5.2 # used by the migration test to build a v5 database by hand
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

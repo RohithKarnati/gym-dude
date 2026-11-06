@@ -228,7 +228,11 @@ class _ExerciseSummary extends ConsumerWidget {
         return Padding(
           padding: const EdgeInsets.only(top: 8, left: 58),
           child: Text(
-            exercises.map((e) => e.name).join(' · '),
+            exercises
+                .map((e) => e.targetWeightKg == null
+                    ? e.name
+                    : '${e.name} (${_fmtWeight(e.targetWeightKg!)}kg)')
+                .join(' · '),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(color: scheme.onSurfaceVariant),
@@ -238,6 +242,9 @@ class _ExerciseSummary extends ConsumerWidget {
     );
   }
 }
+
+String _fmtWeight(double v) =>
+    v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toString();
 
 class _Pill extends StatelessWidget {
   const _Pill({required this.label, required this.color, required this.onColor});

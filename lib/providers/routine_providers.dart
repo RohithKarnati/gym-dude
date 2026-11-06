@@ -2,21 +2,31 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/database.dart';
 import '../data/routine_dao.dart';
+import '../utils/recurrence.dart';
 import 'database_provider.dart';
 
 final routineDaoProvider = Provider<RoutineDao>((ref) {
   return RoutineDao(ref.watch(databaseProvider));
 });
 
-// --- Daily checklist (F5) ---------------------------------------------------
+/// User-defined lists (tabs), ordered.
+final routineListsProvider = StreamProvider<List<RoutineList>>((ref) {
+  return ref.watch(routineDaoProvider).watchLists();
+});
 
-final routineItemsProvider = StreamProvider<List<RoutineItem>>((ref) {
+/// Active checklist tasks in one list.
+final listItemsProvider =
+    StreamProvider.family<List<RoutineItem>, int>((ref, listId) {
+  return ref.watch(routineDaoProvider).watchItemsForList(listId);
+});
+
+/// All active checklist tasks across all lists (reminders, progress).
+final allRoutineItemsProvider = StreamProvider<List<RoutineItem>>((ref) {
   return ref.watch(routineDaoProvider).watchActiveItems();
 });
 
 /// Today's completion rows.
-final routineChecksTodayProvider =
-    StreamProvider<List<RoutineCheck>>((ref) {
+final routineChecksTodayProvider = StreamProvider<List<RoutineCheck>>((ref) {
   return ref.watch(routineDaoProvider).watchChecksForDay(DateTime.now());
 });
 
@@ -26,30 +36,13 @@ final doneTodayIdsProvider = Provider<Set<int>>((ref) {
   return {for (final c in checks) if (c.isDone) c.routineItemId};
 });
 
-/// (done, total) for today's checklist — drives the home progress ring.
+/// (done, total) for *today's scheduled* tasks — drives the home progress ring.
 typedef Progress = ({int done, int total});
 
 final dailyProgressProvider = Provider<Progress>((ref) {
-  final items = ref.watch(routineItemsProvider).value ?? const [];
+  final items = ref.watch(allRoutineItemsProvider).value ?? const [];
   final done = ref.watch(doneTodayIdsProvider);
-  final total = items.length;
-  final doneCount = items.where((i) => done.contains(i.id)).length;
-  return (done: doneCount, total: total);
-});
-
-// --- Weekly meal-prep (F6) --------------------------------------------------
-
-final mealPrepTasksProvider = StreamProvider<List<MealPrepTask>>((ref) {
-  return ref.watch(routineDaoProvider).watchActiveTasks();
-});
-
-final mealPrepChecksThisWeekProvider =
-    StreamProvider<List<MealPrepCheck>>((ref) {
-  final weekStart = RoutineDao.mondayOf(DateTime.now());
-  return ref.watch(routineDaoProvider).watchMealPrepChecksForWeek(weekStart);
-});
-
-final mealPrepDoneIdsProvider = Provider<Set<int>>((ref) {
-  final checks = ref.watch(mealPrepChecksThisWeekProvider).value ?? const [];
-  return {for (final c in checks) if (c.isDone) c.mealPrepTaskId};
+  final today = items.where((i) => isScheduledToday(i.daysMask)).toList();
+  final doneCount = today.where((i) => done.contains(i.id)).length;
+  return (done: doneCount, total: today.length);
 });

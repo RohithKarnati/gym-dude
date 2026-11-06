@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android Auto Backup / transfer rules (API 31+).
+
+  Back up ONLY the drift database (see backup_rules.xml for the rationale):
+  complete user data in one small file, under the 25 MB cap, skipping the large
+  regenerated app_flutter/flutter_assets folder.
+
+  - cloud-backup:    Google Drive backup, restored on reinstall / new device.
+  - device-transfer: direct phone-to-phone transfer during setup.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="root" path="app_flutter/gym_dude.sqlite" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="root" path="app_flutter/gym_dude.sqlite" />
+    </device-transfer>
+</data-extraction-rules>
